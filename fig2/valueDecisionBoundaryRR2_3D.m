@@ -5,7 +5,7 @@ resSL  = 15;      % Grid resolution of state space
 resS = 41;      % Grid resolution of state space
 tmax = 3;       % Time limit
 dt   = .05;       % Time step
-c    = 0;       % Cost of evidene accumulation
+c    = 0.1;       % Cost of evidence accumulation
 tNull = .25;     % Non-decision time + inter trial interval
 g{1}.meanR = 0; % Prior mean of state (dimension 1)
 g{1}.varR  = 5; % Prior variance of stte
@@ -18,6 +18,9 @@ g{3}.varR  = 5; % Prior variance of state
 g{3}.varX  = 2; % Observation noise variance
 t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
+global gamm geometric; % (JARM 23rd August '19)
+geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
+gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
 
 %% Utililty function:
 utilityFunc = @(X) X;
@@ -55,7 +58,11 @@ myCol = [1 0 0; 0 1 0; 0 0 1];
 iT = 1;
 subplotXY(5,4,2,1); [r1Max,r2Max,vMax] = plotSurf(Sscale, V(:,:,iS3,iT)                , iS2, [0 0 0], Slabel); axis(rect); title('V(0)');
 %                     plot3(g{1}.meanR, g{2}.meanR, V0, 'g.', 'MarkerSize',15);
-subplotXY(5,4,3,1); [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iT)-(rho+c)*dt, iS2, [1 0 0], Slabel); axis(rect); title('<V(\deltat)|R^{hat}(0)> - (\rho+c)\deltat');
+if geometric
+  subplotXY(5,4,3,1); [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iT), iS2, [1 0 0], Slabel); axis(rect); title('<V(\deltat)|R^{hat}(0)> - (\rho+c)\deltat'); % (JARM 23rd August '19) remove cost of time since incorporated into discounted reward rate
+else
+  subplotXY(5,4,3,1); [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iT)-(rho+c)*dt, iS2, [1 0 0], Slabel); axis(rect); title('<V(\deltat)|R^{hat}(0)> - (\rho+c)\deltat');
+end
 subplotXY(5,4,4,1); [r1Dec,r2Dec,vDec] = plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull     , iS2, [0 0 1], Slabel); axis(rect); title('max(R_1^{hat},R_2^{hat}) - \rho t_{Null}');
 subplotXY(5,4,5,1); hold on;
     plot((r1Max-r2Max)/2, vMax, 'k:', (r1Acc-r2Acc)/2, vAcc, 'r', (r1Dec-r2Dec)/2, vDec, 'b');
@@ -64,10 +71,20 @@ subplotXY(5,4,1,1); imagesc(Sscale, Sscale, D(:,:,  1), [1 4]); axis square; axi
                     plot(r1Max, r2Max, 'r-');
 %                     plot(g{1}.meanR, g{2}.meanR, 'g.');
 %% t=0 (superimposed & difference):
-subplotXY(5,4,3,2); plotSurf(Sscale, EVnext(:,:,iS3,iT)-(rho+c)*dt                             , iS2, [1 0 0], Slabel); hold on;
+if geometric
+  subplotXY(5,4,3,2); plotSurf(Sscale, EVnext(:,:,iS3,iT)                                        , iS2, [1 0 0], Slabel); hold on; % (JARM 23rd August '19) remove cost of time since incorporated into discounted reward rate    
+else
+  subplotXY(5,4,3,2); plotSurf(Sscale, EVnext(:,:,iS3,iT)-(rho+c)*dt                             , iS2, [1 0 0], Slabel); hold on;
+end
                     plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull                                  , iS2, [0 0 1], Slabel); axis(rect);
-subplotXY(5,4,4,2); plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull - (EVnext(:,:,iS3,iT)-(rho+c)*dt), iS2, [0 1 0], Slabel); xlim(rect(1:2)); ylim(rect(1:2));
-subplotXY(5,4,5,2); plotDecisionVolume(S, D(:,:,:,iT), rect(1:2));
+if geometric
+  subplotXY(5,4,4,2); plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull - EVnext(:,:,iS3,iT), iS2, [0 1 0], Slabel); xlim(rect(1:2)); ylim(rect(1:2)); % (JARM 23rd August '19) remove cost of time since incorporated into discounted reward rate     
+else 
+  subplotXY(5,4,4,2); plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull - (EVnext(:,:,iS3,iT)-(rho+c)*dt), iS2, [0 1 0], Slabel); xlim(rect(1:2)); ylim(rect(1:2));
+end
+if geometric == false
+  subplotXY(5,4,5,2); plotDecisionVolume(S, D(:,:,:,iT), rect(1:2)); % (JARM 23rd August '19) error computing convex hull under geometric discounting
+end
 %% t=dt:
 subplotXY(5,4,1,2); imagesc(Sscale, Sscale, D(:,:,iS3,iT+1), [1 4]); axis square; axis xy; title('D(\deltat)'); xlabel(Slabel{1}); ylabel(Slabel{2}); hold on; axis(rect(1:4));
 subplotXY(5,4,2,2); plotSurf(Sscale, V(:,:,iS3,iT+1), iS2, [0 0 0], Slabel); axis(rect); title('V(\deltat)');
@@ -75,12 +92,18 @@ subplotXY(5,4,2,2); plotSurf(Sscale, V(:,:,iS3,iT+1), iS2, [0 0 0], Slabel); axi
 % subplotXY(5,4,3,2); surfl(Sscale(iStrans{1}{2}), Sscale(iStrans{1}{2}), Ptrans{1}); title('P(R^{hat}(\deltat)|R^{hat}(0))'); shading interp; hold on; axis([rect 0 Inf]); axis off;
 subplotXY(5,4,1,3); imagesc(Sscale, Sscale, D(:,:,iS3,iTmax-1), [1 4]); axis square; axis xy; title('D(T-\deltat)'); hold on; rectangle('Position',[rect(1) rect(3) rect(2)-rect(1) rect(4)-rect(3)]); axis(rect);
 subplotXY(5,4,2,3); [r1Max,r2Max,vMax] = plotSurf(Sscale, V(:,:,iS3,iTmax-1)                , iS2, [0 0 0], Slabel); axis(rect); title('V(T-\deltat)')
-subplotXY(5,4,3,3); [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iTmax-1)-(rho+c)*dt, iS2, [1 0 0], Slabel); axis(rect); title('<V(T)|R^{hat}(T-\deltat)> - (\rho+c) \deltat');
+if geometric
+  subplotXY(5,4,3,3); [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iTmax-1), iS2, [1 0 0], Slabel); axis(rect); title('<V(T)|R^{hat}(T-\deltat)>'); % (JARM 23rd August '19) remove cost of time since incorporated into discounted reward rate  
+else
+  subplotXY(5,4,3,3); [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iTmax-1)-(rho+c)*dt, iS2, [1 0 0], Slabel); axis(rect); title('<V(T)|R^{hat}(T-\deltat)> - (\rho+c) \deltat');
+end
 subplotXY(5,4,4,3); [r1Dec,r2Dec,vDec] = plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull          , iS2, [0 0 1], Slabel); axis(rect); title('max(R_1^{Hat},R_2^{Hat}) - \rho t_{Null}');
 subplotXY(5,4,5,3); hold on;
     plot((r1Max-r2Max)/2, vMax, 'k:', (r1Acc-r2Acc)/2, vAcc, 'r', (r1Dec-r2Dec)/2, vDec, 'b');
     xlabel(['(' Slabel{1} '-' Slabel{2} ')/2']); xlim(rect(1:2)); %ylim(rect(5:6));
-subplotXY(5,4,5,4); plotDecisionVolume(S, D(:,:,:,iTmax-1), rect(1:2));
+if geometric == false
+    subplotXY(5,4,5,4); plotDecisionVolume(S, D(:,:,:,iTmax-1), rect(1:2)); % (JARM 23rd August '19) error computing convex hull under geometric discounting
+end
 %% t=T:
 subplotXY(5,4,1,4); imagesc(Sscale, Sscale, D(:,:,iS3,iTmax), [1 4]); axis square; axis xy; title('D(T)'); hold on; axis(rect(1:4));
 subplotXY(5,4,2,4); plotSurf(Sscale, V(:,:,iS3,iTmax), iS2, [0 0 0], Slabel); title('V(T) = max(R_1^{hat},R_2^{hat}) - \rho t_{Null}'); axis(rect);
@@ -110,11 +133,16 @@ toc;
 
 
 function [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(rho_,c,tNull,g,Rh,S,t,dt,iS0)
+global gamm geometric;
 rho = rho_;                                                                        % Reward rate estimate
 [V(:,:,:,length(t)), D(:,:,:,length(t))] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull});       % Max V~ at time tmax
 for iT = length(t)-1:-1:1
     [EVnext(:,:,:,iT), Ptrans{iT}, iStrans{iT}] = E(V(:,:,:,iT+1),S,t(iT),dt,g);                            % <V~(t+1)|S(t)> for waiting
-    [V(:,:,:,iT), D(:,:,:,iT)] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull, EVnext(:,:,:,iT)-(rho+c)*dt});       % [Average-adjusted value (V~), decision] at time t
+    if geometric
+      [V(:,:,:,iT), D(:,:,:,iT)] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull, EVnext(:,:,:,iT)*gamm});       % (JARM 23rd August'19) [geometrically-discounted value (V~), decision] at time t    
+    else
+      [V(:,:,:,iT), D(:,:,:,iT)] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull, EVnext(:,:,:,iT)-(rho+c)*dt});       % [Average-adjusted value (V~), decision] at time t
+    end
 %     fprintf('%d/%d\t',iT,length(t)-1); toc;
 end
 V0 = mean(vector(V(iS0(1),iS0(2),1)));
@@ -175,6 +203,7 @@ xlabel(Slabel{1}); ylabel(Slabel{2}); %zlim([-50 50]);
 % h = get(gca,'YLabel'); set(h,'FontSize',8, 'Position',get(h,'Position')+[1 .2 0]);
 
 function [dbIS] = plotDecisionVolume(S, D, minmax, myCol)
+global geometric
 if nargin < 4;  myCol = [1 0 0 0.5; 0 1 0 0.5; 0 0 1 0.5];  end;
 shiftMin = 0.01 * [1 0 0; 0 1 0; 0 0 1];
 for iD = 3:-1:1
@@ -186,10 +215,18 @@ for iD = 3:-1:1
         case 3
             idx = D==3 | D==23 | D==13 | D==123;
     end
-%     plot3(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)), '.', 'Color', myCol(iD,:));
-    db{iD}.vertices = [vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx))];
-    db{iD}.faces = convhull(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)));
-    trisurf(db{iD}.faces, db{iD}.vertices(:,1)+shiftMin(iD,1), db{iD}.vertices(:,2)+shiftMin(iD,2), db{iD}.vertices(:,3)+shiftMin(iD,3), 'FaceColor',myCol(iD,1:3),'FaceAlpha',myCol(iD,4),'EdgeColor','none'); hold on;
+%      plot3(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)), '.', 'Color', myCol(iD,:));
+      db{iD}.vertices = [vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx))];
+      if geometric
+        size(vector(S{1}(idx)))
+        size(vector(S{2}(idx)))
+        size(vector(S{3}(idx)))
+        geometric
+        db{iD}.faces = delaunay(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)));
+      else
+        db{iD}.faces = convhull(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)));
+      end
+      trisurf(db{iD}.faces, db{iD}.vertices(:,1)+shiftMin(iD,1), db{iD}.vertices(:,2)+shiftMin(iD,2), db{iD}.vertices(:,3)+shiftMin(iD,3), 'FaceColor',myCol(iD,1:3),'FaceAlpha',myCol(iD,4),'EdgeColor','none'); hold on;
 end
 attractor.vertices = [[1;-1;-1], [-1;1;-1], [-1;-1;1]];
 attractor.faces = [1 2 3; 1 2 3; 1 2 3];
