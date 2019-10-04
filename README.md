@@ -1,5 +1,9 @@
 # MultiAlternativeDecisions
-Code for Tajima et al. (2019). Optimal policy for multi-alternative decisions. Nature Neuroscience.
+Code for comment on Tajima et al. (2019). Optimal policy for multi-alternative decisions. Nature Neuroscience.
+
+These codes modify the analysis presented in the paper by Tajima et al. (2019), to examine the implication of maximising geometric-discounted future rewards on the optimal policy, rather than maximising arithmetic mean reward rate.
+
+**N.B.** reward rate across trials is not maximised, but set to 0; this has the effect of considering only single trial dynamics, since the cost of waiting for the next trial becomes zero. 
 
 ## Installation
 
@@ -15,3 +19,5 @@ addpath('shared/')
 addpath('shared/bads-1.0.4/')
 ```
 at the MATLAB command line. See the individual `fig` folders for further usage instructions.
+
+To switch between maxisation of geometrically-discounted rewards and arithmetic mean reward rate, toggle the value of the `geometric` variable.

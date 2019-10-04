@@ -18,9 +18,10 @@ g{3}.varR  = 5; % Prior variance of state
 g{3}.varX  = 2; % Observation noise variance
 t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
-global gamm geometric; % (JARM 23rd August '19)
+global gamm geometric epsil; % (JARM 23rd August '19)
 geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
 gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
+epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 
 %% Utililty function:
 utilityFunc = @(X) X;
@@ -34,7 +35,11 @@ iS0 = [findnearest(g{1}.meanR, SscaleL) findnearest(g{2}.meanR, SscaleL) findnea
 for iC = 3:-1:1;  Rh{iC} = utilityFunc(S{iC});  end                                                          % Expected reward for option iC
 [RhMax, Dd] = max_({Rh{1}, Rh{2}, Rh{3}});                                                                   % Expected reward for decision
 [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(g{1}.meanR,c,tNull,g,Rh,S,t,dt,iS0);
-rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR);                            % Reward rate
+if geometric == false
+    rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR)                            % Reward rate
+else
+    rho_ = 0; % (JARM 20th September '19) reward rate optimisation does not currently converge for geometric discounting
+end
 
 %% Reward rate, Average-adjusted value, Decision (high resolution):
 Sscale = linspace(-Smax, Smax, resS);
@@ -82,9 +87,9 @@ if geometric
 else 
   subplotXY(5,4,4,2); plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull - (EVnext(:,:,iS3,iT)-(rho+c)*dt), iS2, [0 1 0], Slabel); xlim(rect(1:2)); ylim(rect(1:2));
 end
-if geometric == false
-  subplotXY(5,4,5,2); plotDecisionVolume(S, D(:,:,:,iT), rect(1:2)); % (JARM 23rd August '19) error computing convex hull under geometric discounting
-end
+%if geometric == false
+subplotXY(5,4,5,2); plotDecisionVolume(S, D(:,:,:,iT), rect(1:2)); % (JARM 23rd August '19) error computing convex hull under geometric discounting
+%end
 %% t=dt:
 subplotXY(5,4,1,2); imagesc(Sscale, Sscale, D(:,:,iS3,iT+1), [1 4]); axis square; axis xy; title('D(\deltat)'); xlabel(Slabel{1}); ylabel(Slabel{2}); hold on; axis(rect(1:4));
 subplotXY(5,4,2,2); plotSurf(Sscale, V(:,:,iS3,iT+1), iS2, [0 0 0], Slabel); axis(rect); title('V(\deltat)');
@@ -101,9 +106,9 @@ subplotXY(5,4,4,3); [r1Dec,r2Dec,vDec] = plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNu
 subplotXY(5,4,5,3); hold on;
     plot((r1Max-r2Max)/2, vMax, 'k:', (r1Acc-r2Acc)/2, vAcc, 'r', (r1Dec-r2Dec)/2, vDec, 'b');
     xlabel(['(' Slabel{1} '-' Slabel{2} ')/2']); xlim(rect(1:2)); %ylim(rect(5:6));
-if geometric == false
-    subplotXY(5,4,5,4); plotDecisionVolume(S, D(:,:,:,iTmax-1), rect(1:2)); % (JARM 23rd August '19) error computing convex hull under geometric discounting
-end
+%if geometric == false
+  subplotXY(5,4,5,4); plotDecisionVolume(S, D(:,:,:,iTmax-1), rect(1:2)); % (JARM 23rd August '19) error computing convex hull under geometric discounting
+%end
 %% t=T:
 subplotXY(5,4,1,4); imagesc(Sscale, Sscale, D(:,:,iS3,iTmax), [1 4]); axis square; axis xy; title('D(T)'); hold on; axis(rect(1:4));
 subplotXY(5,4,2,4); plotSurf(Sscale, V(:,:,iS3,iTmax), iS2, [0 0 0], Slabel); title('V(T) = max(R_1^{hat},R_2^{hat}) - \rho t_{Null}'); axis(rect);
@@ -203,7 +208,7 @@ xlabel(Slabel{1}); ylabel(Slabel{2}); %zlim([-50 50]);
 % h = get(gca,'YLabel'); set(h,'FontSize',8, 'Position',get(h,'Position')+[1 .2 0]);
 
 function [dbIS] = plotDecisionVolume(S, D, minmax, myCol)
-global geometric
+global geometric epsil
 if nargin < 4;  myCol = [1 0 0 0.5; 0 1 0 0.5; 0 0 1 0.5];  end;
 shiftMin = 0.01 * [1 0 0; 0 1 0; 0 0 1];
 for iD = 3:-1:1
@@ -218,11 +223,11 @@ for iD = 3:-1:1
 %      plot3(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)), '.', 'Color', myCol(iD,:));
       db{iD}.vertices = [vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx))];
       if geometric
-        size(vector(S{1}(idx)))
-        size(vector(S{2}(idx)))
-        size(vector(S{3}(idx)))
-        geometric
-        db{iD}.faces = delaunay(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)));
+%        size(vector(S{1}(idx)))
+%        size(vector(S{2}(idx)))
+%        size(vector(S{3}(idx)))
+%        geometric
+        db{iD}.faces = convhull(vector(S{1}(idx)) + epsil * randn(size(vector(S{1}(idx)))), vector(S{2}(idx)) + epsil * randn(size(vector(S{1}(idx)))), vector(S{3}(idx)) + epsil * randn(size(vector(S{1}(idx)))));
       else
         db{iD}.faces = convhull(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)));
       end
@@ -231,13 +236,13 @@ end
 attractor.vertices = [[1;-1;-1], [-1;1;-1], [-1;-1;1]];
 attractor.faces = [1 2 3; 1 2 3; 1 2 3];
 trisurf(attractor.faces, attractor.vertices(:,1), attractor.vertices(:,2), attractor.vertices(:,3), 'FaceColor',[0 0 0],'FaceAlpha',0.1,'EdgeColor','none'); hold on;
-for iD = 3:-1:1
-    [~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
-    dbIS{iD}.vertices2d = dbIS{iD}.vertices * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]';
-    line([dbIS{iD}.vertices(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),1)]',...
-         [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),2)]',...
-         [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),3)]', ...
-         'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+    for iD = 3:-1:1
+        [~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
+        dbIS{iD}.vertices2d = dbIS{iD}.vertices * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]';
+        line([dbIS{iD}.vertices(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),1)]',...
+             [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),2)]',...
+             [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),3)]', ...
+             'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
 end
 a = minmax(1);  b = minmax(2);
 line([a b; a a; a b; a a;   a a; a a; b b; b b;   a b; a a; a b; a a]', ...
