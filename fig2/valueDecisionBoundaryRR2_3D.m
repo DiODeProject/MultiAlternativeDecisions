@@ -19,9 +19,11 @@ g{3}.varX  = 2; % Observation noise variance
 t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
 global gamm geometric epsil; % (JARM 23rd August '19)
-geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
+global valscale; % (JARM 7th October '19)
+geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
 gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
+valscale = 0 % (JARM 7th October '19)
 
 %% Utililty function:
 utilityFunc = @(X) X;
@@ -208,7 +210,7 @@ xlabel(Slabel{1}); ylabel(Slabel{2}); %zlim([-50 50]);
 % h = get(gca,'YLabel'); set(h,'FontSize',8, 'Position',get(h,'Position')+[1 .2 0]);
 
 function [dbIS] = plotDecisionVolume(S, D, minmax, myCol)
-global geometric epsil
+global geometric epsil valscale
 if nargin < 4;  myCol = [1 0 0 0.5; 0 1 0 0.5; 0 0 1 0.5];  end;
 shiftMin = 0.01 * [1 0 0; 0 1 0; 0 0 1];
 for iD = 3:-1:1
@@ -233,7 +235,7 @@ for iD = 3:-1:1
       end
       trisurf(db{iD}.faces, db{iD}.vertices(:,1)+shiftMin(iD,1), db{iD}.vertices(:,2)+shiftMin(iD,2), db{iD}.vertices(:,3)+shiftMin(iD,3), 'FaceColor',myCol(iD,1:3),'FaceAlpha',myCol(iD,4),'EdgeColor','none'); hold on;
 end
-attractor.vertices = [[1;-1;-1], [-1;1;-1], [-1;-1;1]];
+attractor.vertices = [[1;-1;-1] - valscale, [-1;1;-1] - valscale, [-1;-1;1] - valscale];
 attractor.faces = [1 2 3; 1 2 3; 1 2 3];
 trisurf(attractor.faces, attractor.vertices(:,1), attractor.vertices(:,2), attractor.vertices(:,3), 'FaceColor',[0 0 0],'FaceAlpha',0.1,'EdgeColor','none'); hold on;
     for iD = 3:-1:1
