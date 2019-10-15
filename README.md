@@ -21,3 +21,5 @@ addpath('shared/bads-1.0.4/')
 at the MATLAB command line. See the individual `fig` folders for further usage instructions.
 
 To switch between maxisation of geometrically-discounted rewards and arithmetic mean reward rate, toggle the value of the `geometric` variable.
+
+To scale option values change the value of the `valscale` variable.
