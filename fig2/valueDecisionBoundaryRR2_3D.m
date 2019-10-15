@@ -20,10 +20,10 @@ t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
 global gamm geometric epsil; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
-geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
+geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
 gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
-valscale = 0 % (JARM 7th October '19)
+valscale = 0 % (JARM 7th October '19) move triangle along diagonal as option values scale)
 
 %% Utililty function:
 utilityFunc = @(X) X;
@@ -129,10 +129,12 @@ for iiT = 1:length(iT)
     subplotXY(4,length(iT),4,iiT);
         patch([-sqrt(2) sqrt(2) 0 -sqrt(2)], [-1/sqrt(3) -1/sqrt(3) sqrt(3) -1/sqrt(3)],'w', 'EdgeColor',0.5*[1 1 1]);
         for iD = 1:3
-            line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
-                 [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
-                 [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),3)]', ...
-                 'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+            if isempty(dbIS{iD}) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+                line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
+                     [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
+                     [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),3)]', ...
+                     'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+            end
         end
         axis([-2 2 -2 2 -1 1]); view([0 90]); axis off;
 end
@@ -235,16 +237,18 @@ for iD = 3:-1:1
       end
       trisurf(db{iD}.faces, db{iD}.vertices(:,1)+shiftMin(iD,1), db{iD}.vertices(:,2)+shiftMin(iD,2), db{iD}.vertices(:,3)+shiftMin(iD,3), 'FaceColor',myCol(iD,1:3),'FaceAlpha',myCol(iD,4),'EdgeColor','none'); hold on;
 end
-attractor.vertices = [[1;-1;-1] - valscale, [-1;1;-1] - valscale, [-1;-1;1] - valscale];
+attractor.vertices = [[1;-1;-1] + valscale, [-1;1;-1] + valscale, [-1;-1;1] + valscale]; % (JARM 7th October '19 move triangle along diagonal as option values scale)
 attractor.faces = [1 2 3; 1 2 3; 1 2 3];
 trisurf(attractor.faces, attractor.vertices(:,1), attractor.vertices(:,2), attractor.vertices(:,3), 'FaceColor',[0 0 0],'FaceAlpha',0.1,'EdgeColor','none'); hold on;
     for iD = 3:-1:1
         [~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
-        dbIS{iD}.vertices2d = dbIS{iD}.vertices * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]';
-        line([dbIS{iD}.vertices(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),1)]',...
-             [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),2)]',...
-             [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),3)]', ...
-             'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+        if isempty(dbIS{iD}.vertices) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+            dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
+            line([dbIS{iD}.vertices(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),1)]',... 
+                 [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),2)]',...
+                 [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),3)]', ...
+                 'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+        end
 end
 a = minmax(1);  b = minmax(2);
 line([a b; a a; a b; a a;   a a; a a; b b; b b;   a b; a a; a b; a a]', ...
