@@ -24,13 +24,14 @@ geometric = false; % (JARM 23rd August '19) use geometric discounting for future
 gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 valscale = 0.5 % (JARM 7th October '19) move triangle along diagonal as option values scale)
-logslope = 5
+maxval = 0.25 % (JARM 6th March '20) maximum utility for logistic utility function
+logslope = 5 % (JARM 6th March '20) slope parameter for logistic utility function
 
 %% Utililty function:
 %utilityFunc = @(X) X;
-utilityFunc = @(X) tanh(X);
+%utilityFunc = @(X) tanh(X);
 %utilityFunc = @(X) sign(X).*abs(X).^0.5;
-%utilityFunc = @(X) 1./(1+exp(-logslope*(X)));
+utilityFunc = @(X) maxval./(1+exp(-logslope*(X)));
 
 
 figure;
