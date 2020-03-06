@@ -20,15 +20,22 @@ t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
 global gamm geometric epsil; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
-geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
+geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
 gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
-valscale = 0 % (JARM 7th October '19) move triangle along diagonal as option values scale)
+valscale = 0.5 % (JARM 7th October '19) move triangle along diagonal as option values scale)
+logslope = 5
 
 %% Utililty function:
-utilityFunc = @(X) X;
-% utilityFunc = @(X) tanh(X);
-% utilityFunc = @(X) sign(X).*abs(X).^0.5;
+%utilityFunc = @(X) X;
+utilityFunc = @(X) tanh(X);
+%utilityFunc = @(X) sign(X).*abs(X).^0.5;
+%utilityFunc = @(X) 1./(1+exp(-logslope*(X)));
+
+
+figure;
+x=(-2:0.1:2);
+plot(x,utilityFunc(x));
 
 %% Reward rate, Average-adjusted value, Decision (finding solution):
 SscaleL  = linspace(-Smax, Smax, resSL);
