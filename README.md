@@ -1,5 +1,6 @@
 # MultiAlternativeDecisions
 Code for comment on Tajima et al. (2019). Optimal policy for multi-alternative decisions. Nature Neuroscience.
+* [Preprint](https://www.biorxiv.org/content/10.1101/2019.12.18.880872v1.abstract)
 
 These codes modify the analysis presented in the paper by Tajima et al. (2019), to examine the implication of maximising geometric-discounted future rewards on the optimal policy, rather than maximising arithmetic mean reward rate.
 
