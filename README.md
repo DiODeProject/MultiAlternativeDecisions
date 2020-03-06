@@ -23,3 +23,5 @@ at the MATLAB command line. See the individual `fig` folders for further usage i
 To switch between maxisation of geometrically-discounted rewards and arithmetic mean reward rate, toggle the value of the `geometric` variable.
 
 To scale option values change the value of the `valscale` variable.
+
+To change between linear and various nonlinear utility functions uncomment the appropriate `utilityFunc` definition.
