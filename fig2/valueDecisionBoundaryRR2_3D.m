@@ -1,37 +1,38 @@
 function valueDecisionBoundaryRR2_3D()
+global gamm geometric epsil pie; % (JARM 23rd August '19)
+global valscale; % (JARM 7th October '19)
+geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
+gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
+epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
+pie = 1; % (JARM 27th May '20) input-dependent noise scaling 
+valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
+maxval = 0.25; % (JARM 6th March '20) maximum utility for logistic utility function
+logslope = 5; % (JARM 6th March '20) slope parameter for logistic utility function
 tic;
 Smax = 4;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
 resSL  = 15;      % Grid resolution of state space
-resS = 41;      % Grid resolution of state space
+resS = 101;      % Grid resolution of state space
 tmax = 3;       % Time limit
 dt   = .05;       % Time step
 c    = 0.1;       % Cost of evidence accumulation
 tNull = .25;     % Non-decision time + inter trial interval
 g{1}.meanR = 0; % Prior mean of state (dimension 1)
 g{1}.varR  = 5; % Prior variance of stte
-g{1}.varX  = 2; % Observation noise variance
+g{1}.varX  = 2 + (pie * valscale); % Observation noise variance
 g{2}.meanR = 0; % Prior mean of state (dimension 2)
 g{2}.varR  = 5; % Prior variance of state
-g{2}.varX  = 2; % Observation noise variance
+g{2}.varX  = 2 + (pie * valscale); % Observation noise variance
 g{3}.meanR = 0; % Prior mean of state (dimension 3)
 g{3}.varR  = 5; % Prior variance of state
-g{3}.varX  = 2; % Observation noise variance
+g{3}.varX  = 2 + (pie * valscale); % Observation noise variance
 t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
-global gamm geometric epsil; % (JARM 23rd August '19)
-global valscale; % (JARM 7th October '19)
-geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
-gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
-epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
-valscale = 0.5 % (JARM 7th October '19) move triangle along diagonal as option values scale)
-maxval = 0.25 % (JARM 6th March '20) maximum utility for logistic utility function
-logslope = 5 % (JARM 6th March '20) slope parameter for logistic utility function
 
 %% Utililty function:
-%utilityFunc = @(X) X;
+utilityFunc = @(X) X;
 %utilityFunc = @(X) tanh(X);
 %utilityFunc = @(X) sign(X).*abs(X).^0.5;
-utilityFunc = @(X) maxval./(1+exp(-logslope*(X)));
+%utilityFunc = @(X) maxval./(1+exp(-logslope*(X)));
 
 
 figure;
