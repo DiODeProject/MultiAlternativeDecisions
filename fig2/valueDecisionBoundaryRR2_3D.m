@@ -1,10 +1,10 @@
 function valueDecisionBoundaryRR2_3D()
 global gamm geometric epsil pie; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
-geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
-gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
+geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
+gamm = 0.999; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
-pie = 1; % (JARM 27th May '20) input-dependent noise scaling 
+pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
 maxval = 0.25; % (JARM 6th March '20) maximum utility for logistic utility function
 logslope = 5; % (JARM 6th March '20) slope parameter for logistic utility function
@@ -13,7 +13,7 @@ Smax = 4;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2
 resSL  = 15;      % Grid resolution of state space
 resS = 101;      % Grid resolution of state space
 tmax = 3;       % Time limit
-dt   = .05;       % Time step
+dt   = .005;       % Time step
 c    = 0.1;       % Cost of evidence accumulation
 tNull = .25;     % Non-decision time + inter trial interval
 g{1}.meanR = 0; % Prior mean of state (dimension 1)
@@ -27,6 +27,7 @@ g{3}.varR  = 5; % Prior variance of state
 g{3}.varX  = 2 + (pie * valscale); % Observation noise variance
 t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
+myCol = [1 0 0; 0 1 0; 0 0 1];
 
 %% Utililty function:
 utilityFunc = @(X) X;
@@ -34,10 +35,9 @@ utilityFunc = @(X) X;
 %utilityFunc = @(X) sign(X).*abs(X).^0.5;
 %utilityFunc = @(X) maxval./(1+exp(-logslope*(X)));
 
-
-figure;
-x=(-2:0.1:2);
-plot(x,utilityFunc(x));
+%figure;
+%x=(-2:0.1:2);
+%plot(x,utilityFunc(x));
 
 %% Reward rate, Average-adjusted value, Decision (finding solution):
 SscaleL  = linspace(-Smax, Smax, resSL);
@@ -62,6 +62,357 @@ for iC = 3:-1:1;  Rh{iC} = utilityFunc(S{iC});  end                             
 
 %% Transform to the space of accumulated evidence:
 % dbX = transformDecBound(dbS2,Sscale,t,g);
+
+%% Run set of tests to measure value-sensitivity in equal alternative case
+savePlots = false;
+updateMeanVarianceEachStep=false; % if true, it uses the posterior as prior mean and variance in the next dt observation
+computeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
+suffix='-fixP';
+%suffix='-varP';
+meanValues=-2:1:3; % mean reward values to be tested 
+%meanValues = 0:1:0; % mean reward values to be tested 
+numruns=3; % number of simulations per test case
+allResults=zeros(length(meanValues)*numruns, 3); % structure to store the simulation results
+j=1; % result line counter
+
+Sscale = linspace(-Smax, Smax, resS); % define the range of possible rewards
+[S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
+Rh{1} = utilityFunc(S{1}); % Expected reward for option 1
+Rh{2} = utilityFunc(S{2}); % Expected reward for option 2
+Rh{3} = utilityFunc(S{3}); % Expected reward for option 3
+for meanValue = meanValues
+    g{1}.meanR = meanValue; g{2}.meanR = meanValue; g{3}.meanR = meanValue; % set prior with equal true mean for all three options
+    %g{1}.meanR = 0; g{2}.meanR = 0; g{3}.meanR = 0; % fix prior of mean to a fixed value 
+    option1Mean = meanValue; option2Mean = meanValue; option3Mean = meanValue; % set actual mean, from which the evidence data is drawn, equal for both options
+    if geometric
+        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),'.mat');
+    else
+        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),'.mat');
+    end
+    dataLoaded = false;
+    if ~computeDecisionBoundaries % load the decision threshold for all timesteps (matrix D)
+        try
+            fprintf('loading boundaries...');
+            load(filename, 'D','rho_');
+            dataLoaded = true;
+            fprintf('done.\n');
+        catch
+            disp('Could not load the decision matrix. Recomputing the data.'); 
+        end
+    end
+    if ~dataLoaded % compute the decision threshold for all timesteps
+        rho_ = 0; % we assume single decisions
+        iS0 = [findnearest(g{1}.meanR, Sscale) findnearest(g{2}.meanR, Sscale) findnearest(g{3}.meanR, Sscale)]; % this line is not really needed
+%         if geometric == false
+%             rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR, optimset('MaxIter',10)); % Reward rate
+%         else
+%             rho_ = 0;  % reward rate optimisation does not currently converge for geometric discounting
+%         end
+        fprintf('computing boundaries...');
+        [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(rho_,c,tNull,g,Rh,S,t,dt,iS0);
+        fprintf('saving boundaries to file...');
+        save(filename,'D','rho_', '-v7.3');
+        fprintf('done.\n');
+    end
+    if savePlots % prepare the figure
+        figure(); clf;
+        set(gcf, 'PaperUnits', 'inches');
+        set(gcf, 'PaperSize', [8 1+numruns*1.5]);
+        set(gcf, 'PaperPositionMode', 'manual');
+        set(gcf, 'PaperPosition', [0 0 8 1+numruns*1.5]);
+    end
+    for run = 1:numruns
+        r1sum=0;
+        r2sum=0;
+        r3sum=0;
+        if updateMeanVarianceEachStep
+            r1m = g{1}.meanR; % mean opt 1
+            r2m = g{2}.meanR; % mean opt 2
+            r3m = g{3}.meanR; % mean opt 3
+            r1v = g{1}.varR; % var opt 1
+            r2v = g{2}.varR; % var opt 2
+            r3v = g{3}.varR; % var opt 3
+        end
+        simTraj = [ ];
+        for iT = 1:1:length(t)-1
+            if updateMeanVarianceEachStep
+                r1v = (r1v * g{1}.varX) / ( g{1}.varX + t(iT) * r1v ); % compute the posterior variance for op 1
+                r2v = (r2v * g{2}.varX) / ( g{2}.varX + t(iT) * r2v ); % compute the posterior variance for op 2
+                r3v = (r3v * g{3}.varX) / ( g{3}.varX + t(iT) * r3v ); % compute the posterior variance for op 3
+                r1m = r1v * ( (r1m/r1v) + (r1sum/g{1}.varX) ); % compute the posterior mean 1
+                r2m = r2v * ( (r2m/r2v) + (r2sum/g{2}.varX) ); % compute the posterior mean 2
+                r3m = r3v * ( (r3m/r2v) + (r3sum/g{3}.varX) ); % compute the posterior mean 3
+            else
+                r1m = ( (g{1}.meanR * g{1}.varX) + (r1sum * g{1}.varR) ) / (g{1}.varX + t(iT) * g{1}.varR ); % compute the posterior mean 1
+                r2m = ( (g{2}.meanR * g{2}.varX) + (r2sum * g{2}.varR) ) / (g{2}.varX + t(iT) * g{2}.varR ); % compute the posterior mean 2
+                r3m = ( (g{3}.meanR * g{3}.varX) + (r3sum * g{3}.varR) ) / (g{3}.varX + t(iT) * g{3}.varR ); % compute the posterior mean 3
+            end
+            if savePlots 
+                simTraj = [simTraj; r1m r2m r3m ];
+            end
+            % find the index of the posterior mean to check in matrix D if decision is made
+            r1i = findnearest(r1m, Sscale, -1);
+            r2i = findnearest(r2m, Sscale, -1);
+            r3i = findnearest(r3m, Sscale, -1);
+            % fprintf('For values (%d,%d) at time %d the D is %d\n',r1v,r2v, t(iT), D(r1i,r2i,iT) )
+            try
+                decisionMade = D(r1i,r2i,r3i,iT) ~= 4;
+            catch
+                fprintf('ERROR for D=%d, t=%d, r1m=%d, r2m=%d, r3m=%d, r1i=%d, r2i=%d, r3i=%d\n',D(r1i,r2i,iT),iT,r1m,r2m,r3m,r1i,r2i,r3i);
+            end
+            if decisionMade
+                break
+            else
+                r1sum = r1sum + normrnd(option1Mean*dt, sqrt(g{1}.varX*dt));
+                r2sum = r2sum + normrnd(option2Mean*dt, sqrt(g{2}.varX*dt));
+                r3sum = r3sum + normrnd(option3Mean*dt, sqrt(g{3}.varX*dt));
+            end
+        end
+        if savePlots
+            valscale = (r1m + r2m + r3m + Smax)/3; % moving to the correct 2d projection plane
+%             dbIS = plotDecisionVolume(S, D(:,:,:,iT), [-Smax Smax] );
+%             hold on; plot3(simTraj(:,1),simTraj(:,2),simTraj(:,3),'k','linewidth',2);
+%             hold on; plot3(r1v,r2v,r3v,'ko','linewidth',2);
+%             figure();
+            %clf;
+            dbIS = compute3dBoundaries(S, D(:,:,:,iT)); % computing the projected boundaries on 2d plane
+            subplot(ceil(numruns/2),2,run); % select subplot
+            plotTrajOnProjection(dbIS, simTraj, myCol); % plot the trajectories on the 2d projection
+            title(['time=' num2str(t(iT)) ' -- \Sigma_i(r_i)=' num2str(sum(simTraj(iT,1:3))) ]);
+            filename = strcat('rawData/traj_geometric-',num2str(geometric),'_r1-',num2str(option1Mean),'_r2-',num2str(option2Mean),'_r3-',num2str(option3Mean),'_',num2str(run),'.txt');
+            csvwrite(filename,simTraj);
+        end
+        dec=D(r1i,r2i,r3i,iT);
+        if isempty(dec) dec=0; end
+        allResults(j,:) = [ meanValue dec t(iT) ];
+        j = j+1;
+    end
+    if savePlots
+        filename = strcat('simFigs/geometric-',num2str(geometric),'_pm-',num2str(g{1}.meanR),'_rm-',num2str(meanValue),'.pdf');
+        saveas(gcf,filename)
+    end
+end
+filename = strcat('resultsData/vs_geometric-',num2str(geometric),suffix,'.txt');
+csvwrite(filename,allResults);
+
+%% Plot value sensitive values
+addpath('../plottinglibs/');
+suffix='-fixP'; % suffix='-varP';
+figure();
+clf;
+set(gcf, 'PaperUnits', 'inches');
+set(gcf, 'PaperSize', [8 4]);
+set(gcf, 'PaperPositionMode', 'manual');
+set(gcf, 'PaperPosition', [0 0 8 4]);
+for geo = [true false]
+    filename = strcat('resultsData/vs_geometric-',num2str(geo),suffix,'.txt');
+    allResults = readtable(filename);
+    fprintf('Loaded file %s with %d lines.\n', filename, height(allResults)/length(meanValues));
+    dataForPlot = [];
+    for meanValue = meanValues
+        dataForPlot = [ dataForPlot, allResults{ allResults{:,1} == meanValue, 3}];
+    end
+    if geo == true
+        geoTitle = 'geom. cost ';
+    else
+        geoTitle = 'linear cost ';
+    end
+    if suffix == '-fixP'
+        priorTitle = '- constant prior -';
+    else
+        priorTitle = '- variable prior -';
+    end
+    subplot(2,2,1+geo); errorbar(meanValues, mean(dataForPlot), std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*1.96); title(['3n - ' geoTitle priorTitle ' mean']);
+    %violin(dataForPlot,'xlabel',string(meanValues))
+    subplot(2,2,3+geo); distributionPlot(dataForPlot,'histOpt',1,'colormap',spring,'xValues',meanValues); title(['3n - ' geoTitle priorTitle ' all data']);
+end
+filename = strcat('simFigs/value-sensitive',suffix,'.pdf');
+saveas(gcf,filename)
+
+
+%% Sim code
+numruns=1;
+plotResults = true;
+
+figure();
+clf;
+set(gcf, 'PaperUnits', 'inches');
+set(gcf, 'PaperSize', [8 numruns*2]);
+set(gcf, 'PaperPositionMode', 'manual');
+set(gcf, 'PaperPosition', [0 0 8 numruns*2]);
+
+for run = 1:numruns
+    r1sum=0;
+    r2sum=0;
+    r3sum=0;
+    simTraj = [ ];
+    for iT = 1:1:length(t)-1
+        r1m = ( (g{1}.meanR * g{1}.varX) + (r1sum * g{1}.varR) ) / (g{1}.varX + t(iT) * g{1}.varR );
+        r2m = ( (g{2}.meanR * g{2}.varX) + (r2sum * g{2}.varR) ) / (g{2}.varX + t(iT) * g{2}.varR );
+        r3m = ( (g{3}.meanR * g{3}.varX) + (r3sum * g{3}.varR) ) / (g{3}.varX + t(iT) * g{3}.varR );
+        r1i = findnearest(r1m, Sscale, -1);
+        r2i = findnearest(r2m, Sscale, -1);
+        r3i = findnearest(r3m, Sscale, -1);
+        simTraj = [simTraj; r1m r2m r3m D(r1i,r2i,r3i,iT) ];
+        %fprintf('For values (%d,%d) at time %d the D is %d\n',r1m,r2m, t(iT), D(r1i,r2i,iT) )
+        if D(r1i,r2i,r3i,iT) ~= 4
+            break
+        else
+            r1sum = r1sum + normrnd(g{1}.meanR*dt, sqrt(g{1}.varX*dt));
+            r2sum = r2sum + normrnd(g{2}.meanR*dt, sqrt(g{2}.varX*dt));
+            r3sum = r3sum + normrnd(g{3}.meanR*dt, sqrt(g{3}.varX*dt));
+        end
+    end
+    if plotResults
+        %subplot(ceil(numruns/2),2,run); imagesc(Sscale, Sscale, D(:,:,iT), [1 3]); axis square; axis xy; title(['D(0) \rho=' num2str(rho_,3)]); xlabel(Slabel{1}); ylabel(Slabel{2});
+        valscale = (r1m + r2m + r3m + Smax)/3;
+        %valscale=0;
+        dbIS = plotDecisionVolume(S, D(:,:,:,iT), [-Smax Smax] );
+        hold on; plot3(simTraj(:,1),simTraj(:,2),simTraj(:,3),'k','linewidth',2);
+        hold on; plot3(r1m,r2m,r3m,'ko','linewidth',2);
+        %filename = strcat('simFigs/geometric-',num2str(geometric),'_r',num2str(run),'.pdf');
+    end
+end
+%filename = strcat('simFigs/geometric-',num2str(geometric),'_r1-',num2str(g{1}.meanR),'_r2-',num2str(g{2}.meanR),'.pdf');
+%savefig(filename)
+%saveas(gcf,filename)
+
+%% Giovanni's 2D plot - temporary test code
+figure()
+%patch([-sqrt(2) sqrt(2) 0 -sqrt(2)], [-1/sqrt(3) -1/sqrt(3) sqrt(3) -1/sqrt(3)],'w', 'EdgeColor',0.5*[1 1 1]);
+%prjMat=[[1;1;0], [0;1;1], [1;0;1]];
+%prjMat=[[0;0;1]-[0;1;0] [1;0;0]-[0;1;0]];
+%prjMat=[ normalize([2 -3 1]); normalize([-1.5119 -0.3780 1.8898])];
+%prjMat=[ normalize([2 -3 1]); normalize([1.5119 0.3780 -1.8898])];
+norma = @(a) a./norm(a);
+%prjMat=[ norma( cross([1 2 4], [1 1 1]) ); norma( cross( [1 1 1], cross([1 2 4], [1 1 1])) )];
+prjMat=[ norma( cross([1 1 1], [1 2 4]) ); norma( cross( cross([1 1 1],[1 2 4]),[1,1,1]) )];
+%prjMat=[[1 0 0]-[0 1 0]; [0 0 1]-[0 1 0]];
+%prjMat= prjMat * (prjMat.' * prjMat)^(-1) * prjMat.';
+%prjMat= prjMat * prjMat.';
+simTrajP = prjMat * simTraj(:,1:3).';
+%simTrajP = simTraj.';
+%simTrajP = [ simTrajP(2,:) + simTrajP(3,:)*0.5 ; (sqrt(3) * simTrajP(3,:))/2 ]; % convert to ternary plot coordinates
+for iD = 1:3
+    %if isempty(dbIS{iD}) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+        %dbIS{iD}.vertices2d = [ [ Smax/2 + dbIS{iD}.vertices(:,2) + dbIS{iD}.vertices(:,3)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * dbIS{iD}.vertices(:,3))/2] ]; % convert to ternary plot coordinates
+        %dbIS{iD}.vertices2d = (dbIS{iD}.vertices) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]';
+        %dbIS{iD}.vert = dbIS{iD}.vertices-valscale;
+        %dbIS{iD}.vertices2d = [ [ Smax/2 + dbIS{iD}.vert(:,2) + dbIS{iD}.vert(:,3)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * dbIS{iD}.vert(:,3))/2] ]; % convert to ternary plot coordinates
+        %dbIS{iD}.vertices2d = [ [ Smax/2 + (dbIS{iD}.vertices(:,2)-valscale) + (dbIS{iD}.vertices(:,3)-valscale)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * (dbIS{iD}.vertices(:,3)-valscale))/2] ]; % convert to ternary plot coordinates
+        dbIS{iD}.vertices2d = (prjMat * (dbIS{iD}.vertices(:,1:3)-valscale).').';
+        %dbIS{iD}.vertices2d = dbIS{iD}.vertices;
+        %dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]';
+        line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
+             [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
+             'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+         %[dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),3)]', ...
+    %end
+end
+%clf;
+hold on; plot(simTrajP(1,:),simTrajP(2,:),'k');
+hold on; plot(simTrajP(1,length(simTraj)),simTrajP(2,length(simTraj)),'or');
+hold on; plot(0,0,'ok');
+daspect([1 1 1]); % aspect ratio 1
+title(['time=' num2str(t(iT)) ' -- \Sigma_i(r_i)=' num2str(sum(simTraj(iT,1:3))) ]);
+
+%% Plot intermediate steps
+stepsize = 10;
+timesteps = stepsize:stepsize:length(simTraj);
+if timesteps(length(timesteps))~=length(simTraj) timesteps = [timesteps length(simTraj)]; end
+figure();
+clf;
+set(gcf, 'PaperUnits', 'inches');
+set(gcf, 'PaperSize', [8 length(timesteps)*2]);
+set(gcf, 'PaperPositionMode', 'manual');
+set(gcf, 'PaperPosition', [0 0 8 length(timesteps)*2]);
+
+for iT = timesteps
+    valscale = (sum(simTraj(iT,1:3)) + Smax)/3;
+    dbIS = compute3dBoundaries(S, D(:,:,:,iT));
+    
+    subplot(ceil(length(timesteps)/2),2,findnearest(iT,timesteps));
+    plotTrajOnProjection(dbIS, simTraj(1:iT,:), myCol);
+    title(['time=' num2str(t(iT)) ' -- \Sigma_i(r_i)=' num2str(sum(simTraj(iT,1:3))) ]);
+end
+filename = strcat('simFigs/fullSim-geometric-',num2str(geometric),'_r1-',num2str(g{1}.meanR),'_r2-',num2str(g{2}.meanR),'_r3-',num2str(g{3}.meanR),'.pdf');
+%savefig(filename)
+saveas(gcf,filename)
+
+%% Plot Trajectory on 2d projection
+function plotTrajOnProjection(dbIS, simTraj, myCol)
+for iD = 1:3
+    if isempty(dbIS{iD}) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+        line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
+             [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
+             'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+    end
+end
+norma = @(a) a./norm(a); % define function to normalise vectors to length 1
+%prjMat=[ norma( cross([1 2 4], [1 1 1]) ); norma( cross( [1 1 1], cross([1 2 4], [1 1 1])) )];
+prjMat=[ norma( cross([1 1 1], [1 2 4]) ); norma( cross( cross([1 1 1],[1 2 4]),[1,1,1]) )]; % compute the projection matrix to project the 3d trajectory onto the 2d plane ortogonal to the diagonal
+simTrajP = prjMat * simTraj(:,1:3).'; % convert the trajectoy's 3d coordinate into 2d (projected) coordiantes
+hold on; plot(simTrajP(1,:),simTrajP(2,:),'k'); % plot trajectory
+hold on; plot(simTrajP(1,length(simTraj)),simTrajP(2,length(simTraj)),'or') % plot dot at final position
+hold on; plot(simTrajP(1,1),simTrajP(1,1),'ok') % plot dot at initial position
+return
+
+%% Compute boundaries
+function [dbIS] = compute3dBoundaries(S, D)
+global geometric epsil valscale
+for iD = 3:-1:1
+    switch iD
+        case 1
+            idx = D==1 | D==12 | D==13 | D==123;
+        case 2
+            idx = D==2 | D==12 | D==23 | D==123;
+        case 3
+            idx = D==3 | D==23 | D==13 | D==123;
+    end
+      db{iD}.vertices = [vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx))];
+      if geometric
+        db{iD}.faces = convhull(vector(S{1}(idx)) + epsil * randn(size(vector(S{1}(idx)))), vector(S{2}(idx)) + epsil * randn(size(vector(S{1}(idx)))), vector(S{3}(idx)) + epsil * randn(size(vector(S{1}(idx)))));
+      else
+        db{iD}.faces = convhull(vector(S{1}(idx)), vector(S{2}(idx)), vector(S{3}(idx)));
+      end
+end
+Smax=max(max(max(S{1})));
+attractor.vertices = [[Smax;-Smax;-Smax] + valscale, [-Smax;Smax;-Smax] + valscale, [-Smax;-Smax;Smax] + valscale]; % (JARM 7th October '19 move triangle along diagonal as option values scale)
+attractor.faces = [1 2 3; 1 2 3; 1 2 3];
+for iD = 3:-1:1
+    [~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
+    if isempty(dbIS{iD}.vertices) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+        norma = @(a) a./norm(a); % define function to normalise vectors to length 1
+        prjMat=[ norma( cross([1 1 1], [1 2 4]) ); norma( cross( cross([1 1 1],[1 2 4]),[1,1,1]) )]; % compute the projection matrix to project the 3d coordinated onto the 2d plane ortogonal to the diagonal
+        dbIS{iD}.vertices2d = (prjMat * (dbIS{iD}.vertices(:,1:3)-valscale).').'; % project the 3d boundaries onto the 2d projection plane
+        %dbIS{iD}.vertices2d = [ [ Smax/2 + (dbIS{iD}.vertices(:,2)-valscale) + (dbIS{iD}.vertices(:,3)-valscale)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * (dbIS{iD}.vertices(:,3)-valscale))/2] ]; % convert to ternary plot coordinates
+        %dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
+    end
+end
+return
+
+%% Giovanni's test plots
+figure();
+cuttingplane=0;
+rect = [-1 1 -1 1 -2.2 1.5];
+iT = 2;
+iS2 = findnearest(cuttingplane, Sscale, -1);
+iS3 = 1;
+[r1Max,r2Max,vMax] = plotSurf(Sscale, V(:,:,iS3,iT), iS2, [0 0 0], Slabel); axis(rect); title('V(0)');
+if geometric
+  [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iT), iS2, [1 0 0], Slabel); axis(rect); title('<V(\deltat)|R^{hat}(0)> - (\rho+c)\deltat'); % (JARM 23rd August '19) remove cost of time since incorporated into discounted reward rate
+else
+  [r1Acc,r2Acc,vAcc] = plotSurf(Sscale, EVnext(:,:,iS3,iT)-(rho+c)*dt, iS2, [1 0 0], Slabel); axis(rect); title('<V(\deltat)|R^{hat}(0)> - (\rho+c)\deltat');
+end
+[r1Dec,r2Dec,vDec] = plotSurf(Sscale, RhMax(:,:,iS3)-rho*tNull, iS2, [0 0 1], Slabel); axis(rect); title('max(R_1^{hat},R_2^{hat}) - \rho t_{Null}');
+% surfl(Sscale, Sscale, ones(length(Sscale),length(Sscale))*cuttingplane); hold on;
+figure()
+plot([-1,1],[1-c*(dt*iT)-rho*tNull,1-c*(dt*iT)-rho*tNull],'k',(r1Max-r2Max)/2, vMax, 'k:', (r1Acc-r2Acc)/2, vAcc, 'r', (r1Dec-r2Dec)/2, vDec, 'b'); xlabel(['(' Slabel{1} '-' Slabel{2} ')/2']); xlim(rect(1:2));
+figure()
+xvals=-4:0.2:4
+yvals=abs(xvals)-rho*tNull
+plot(r1Max, vMax, 'k:', r1Acc, vAcc, 'r', r1Dec, vDec, 'b'); xlabel(['(' Slabel{1} '-' Slabel{2} ')/2']); xlim([-Smax Smax]);
+%plot(xvals,yvals,'g')
 
 %% - Show -
 figure(4565); clf; colormap bone;
@@ -222,7 +573,7 @@ xlabel(Slabel{1}); ylabel(Slabel{2}); %zlim([-50 50]);
 
 function [dbIS] = plotDecisionVolume(S, D, minmax, myCol)
 global geometric epsil valscale
-if nargin < 4;  myCol = [1 0 0 0.5; 0 1 0 0.5; 0 0 1 0.5];  end;
+if nargin < 4;  myCol = [1 0 0 0.5; 0 1 0 0.5; 0 0 1 0.5];  end
 shiftMin = 0.01 * [1 0 0; 0 1 0; 0 0 1];
 for iD = 3:-1:1
     switch iD
@@ -246,18 +597,24 @@ for iD = 3:-1:1
       end
       trisurf(db{iD}.faces, db{iD}.vertices(:,1)+shiftMin(iD,1), db{iD}.vertices(:,2)+shiftMin(iD,2), db{iD}.vertices(:,3)+shiftMin(iD,3), 'FaceColor',myCol(iD,1:3),'FaceAlpha',myCol(iD,4),'EdgeColor','none'); hold on;
 end
-attractor.vertices = [[1;-1;-1] + valscale, [-1;1;-1] + valscale, [-1;-1;1] + valscale]; % (JARM 7th October '19 move triangle along diagonal as option values scale)
+%attractor.vertices = [[1;-1;-1] + valscale, [-1;1;-1] + valscale, [-1;-1;1] + valscale]; % (JARM 7th October '19 move triangle along diagonal as option values scale)
+Smax=max(max(max(S{1})));
+attractor.vertices = [[Smax;-Smax;-Smax] + valscale, [-Smax;Smax;-Smax] + valscale, [-Smax;-Smax;Smax] + valscale]; % (JARM 7th October '19 move triangle along diagonal as option values scale)
 attractor.faces = [1 2 3; 1 2 3; 1 2 3];
 trisurf(attractor.faces, attractor.vertices(:,1), attractor.vertices(:,2), attractor.vertices(:,3), 'FaceColor',[0 0 0],'FaceAlpha',0.1,'EdgeColor','none'); hold on;
-    for iD = 3:-1:1
-        [~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
-        if isempty(dbIS{iD}.vertices) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
-            dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
-            line([dbIS{iD}.vertices(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),1)]',... 
-                 [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),2)]',...
-                 [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),3)]', ...
-                 'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
-        end
+for iD = 3:-1:1
+    [~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
+    if isempty(dbIS{iD}.vertices) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+        %dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
+        %dbIS{iD}.vertices2d = [ [ Smax/2 + (dbIS{iD}.vertices(:,2)-valscale) + (dbIS{iD}.vertices(:,3)-valscale)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * (dbIS{iD}.vertices(:,3)-valscale))/2] ]; % convert to ternary plot coordinates
+        norma = @(a) a./norm(a); % define function to normalise vectors to length 1
+        prjMat=[ norma( cross([1 1 1], [1 2 4]) ); norma( cross( cross([1 1 1],[1 2 4]),[1,1,1]) )]; % compute the projection matrix to project the 3d coordinated onto the 2d plane ortogonal to the diagonal
+        dbIS{iD}.vertices2d = (prjMat * (dbIS{iD}.vertices(:,1:3)-valscale).').'; % project the 3d boundaries onto the 2d projection plane
+        line([dbIS{iD}.vertices(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),1)]',... 
+             [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),2)]',...
+             [dbIS{iD}.vertices(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices(dbIS{iD}.edges(:,2),3)]', ...
+             'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+    end
 end
 a = minmax(1);  b = minmax(2);
 line([a b; a a; a b; a a;   a a; a a; b b; b b;   a b; a a; a b; a a]', ...
