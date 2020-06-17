@@ -2,19 +2,19 @@ function valueDecisionBoundaryRR2_3D()
 global gamm geometric epsil pie; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
 geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
-gamm = 0.999; % (JARM 23rd August '19) geometric discount factor for future rewards 
+gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
 maxval = 0.25; % (JARM 6th March '20) maximum utility for logistic utility function
 logslope = 5; % (JARM 6th March '20) slope parameter for logistic utility function
 tic;
-Smax = 4;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
+Smax = 6;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
 resSL  = 15;      % Grid resolution of state space
-resS = 101;      % Grid resolution of state space
+resS = 151;      % Grid resolution of state space
 tmax = 3;       % Time limit
 dt   = .005;       % Time step
-c    = 0.1;       % Cost of evidence accumulation
+c    = 0.2;       % Cost of evidence accumulation
 tNull = .25;     % Non-decision time + inter trial interval
 g{1}.meanR = 0; % Prior mean of state (dimension 1)
 g{1}.varR  = 5; % Prior variance of stte
@@ -50,6 +50,7 @@ if geometric == false
     rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR)                            % Reward rate
 else
     rho_ = 0; % (JARM 20th September '19) reward rate optimisation does not currently converge for geometric discounting
+    %rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR)
 end
 
 %% Reward rate, Average-adjusted value, Decision (high resolution):
@@ -67,13 +68,26 @@ for iC = 3:-1:1;  Rh{iC} = utilityFunc(S{iC});  end                             
 savePlots = false;
 updateMeanVarianceEachStep=false; % if true, it uses the posterior as prior mean and variance in the next dt observation
 computeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
-suffix='-fixP';
-%suffix='-varP';
-meanValues=-2:1:3; % mean reward values to be tested 
-%meanValues = 0:1:0; % mean reward values to be tested 
-numruns=3; % number of simulations per test case
+priorMeanEqualToEvidenceDataMean=false; % if true the prior mean corresponds exactly to the used evidence data mean, if false the prior mean is a fixed value
+singleDecisions=true; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
+meanValues=0.5:0.5:3; % mean reward values to be tested 
+%meanValues = 0:1:3; % mean reward values to be tested 
+numruns=1000; % number of simulations per test case
 allResults=zeros(length(meanValues)*numruns, 3); % structure to store the simulation results
 j=1; % result line counter
+
+% prepare file suffix
+if priorMeanEqualToEvidenceDataMean
+    priorMeanSuffix='-varP';
+else
+    priorMeanSuffix='-fixP';
+end
+if singleDecisions
+    singleDecisionsSuffix='-singleDec';
+else
+    singleDecisionsSuffix='-multiDec';
+end
+suffix=[priorMeanSuffix singleDecisionsSuffix];
 
 Sscale = linspace(-Smax, Smax, resS); % define the range of possible rewards
 [S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
@@ -81,38 +95,49 @@ Rh{1} = utilityFunc(S{1}); % Expected reward for option 1
 Rh{2} = utilityFunc(S{2}); % Expected reward for option 2
 Rh{3} = utilityFunc(S{3}); % Expected reward for option 3
 for meanValue = meanValues
-    g{1}.meanR = meanValue; g{2}.meanR = meanValue; g{3}.meanR = meanValue; % set prior with equal true mean for all three options
-    %g{1}.meanR = 0; g{2}.meanR = 0; g{3}.meanR = 0; % fix prior of mean to a fixed value 
+    if priorMeanEqualToEvidenceDataMean
+        g{1}.meanR = meanValue; g{2}.meanR = meanValue; g{3}.meanR = meanValue; % set prior with equal true mean for all three options
+    else
+        fixedMeanValue = 1.5;
+        g{1}.meanR = fixedMeanValue; g{2}.meanR = fixedMeanValue; g{3}.meanR = fixedMeanValue; % fix prior of mean to a fixed value 
+    end
     option1Mean = meanValue; option2Mean = meanValue; option3Mean = meanValue; % set actual mean, from which the evidence data is drawn, equal for both options
     if geometric
-        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),'.mat');
+        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'.mat');
     else
-        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),'.mat');
+        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'.mat');
     end
     dataLoaded = false;
-    if ~computeDecisionBoundaries % load the decision threshold for all timesteps (matrix D)
-        try
-            fprintf('loading boundaries...');
-            load(filename, 'D','rho_');
-            dataLoaded = true;
-            fprintf('done.\n');
-        catch
-            disp('Could not load the decision matrix. Recomputing the data.'); 
+    if priorMeanEqualToEvidenceDataMean || meanValue==meanValues(1) % skip loading/computing the decision matrix after the first loop if the prior remains the same (i.e. priorMeanEqualToEvidenceDataMean==false)
+        if ~computeDecisionBoundaries % load the decision threshold for all timesteps (matrix D)
+            try
+                fprintf('loading boundaries...');
+                load(filename, 'D','rho_');
+                dataLoaded = true;
+                fprintf('done.\n');
+            catch
+                disp('Could not load the decision matrix. Recomputing the data.'); 
+            end
         end
-    end
-    if ~dataLoaded % compute the decision threshold for all timesteps
-        rho_ = 0; % we assume single decisions
-        iS0 = [findnearest(g{1}.meanR, Sscale) findnearest(g{2}.meanR, Sscale) findnearest(g{3}.meanR, Sscale)]; % this line is not really needed
-%         if geometric == false
-%             rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR, optimset('MaxIter',10)); % Reward rate
-%         else
-%             rho_ = 0;  % reward rate optimisation does not currently converge for geometric discounting
-%         end
-        fprintf('computing boundaries...');
-        [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(rho_,c,tNull,g,Rh,S,t,dt,iS0);
-        fprintf('saving boundaries to file...');
-        save(filename,'D','rho_', '-v7.3');
-        fprintf('done.\n');
+        if ~dataLoaded % compute the decision threshold for all timesteps
+            fprintf('computing boundaries...');
+            if singleDecisions
+                rho_ = 0; % we assume single decisions
+            else
+                SscaleL  = linspace(-Smax, Smax, resSL);
+                [SLow{1},SLow{2},SLow{3}] = ndgrid(SscaleL, SscaleL, SscaleL);
+                iS0 = [findnearest(g{1}.meanR, SscaleL) findnearest(g{2}.meanR, SscaleL) findnearest(g{3}.meanR, SscaleL)]; % this line is not really needed
+                for iC = 3:-1:1;  RhLow{iC} = utilityFunc(SLow{iC});  end  % Expected reward for option iC
+                rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,RhLow,SLow,t,dt,iS0), g{1}.meanR); % compute future rewards decisions
+                fprintf('rho for mean %d is %d...',g{1}.meanR, rho_);
+            end
+
+            iS0 = [findnearest(g{1}.meanR, Sscale) findnearest(g{2}.meanR, Sscale) findnearest(g{3}.meanR, Sscale)]; % this line is not really needed
+            [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(rho_,c,tNull,g,Rh,S,t,dt,iS0);
+            fprintf('saving boundaries to file...');
+            save(filename,'D','rho_', '-v7.3');
+            fprintf('done.\n');
+        end
     end
     if savePlots % prepare the figure
         figure(); clf;
@@ -183,7 +208,7 @@ for meanValue = meanValues
             csvwrite(filename,simTraj);
         end
         dec=D(r1i,r2i,r3i,iT);
-        if isempty(dec) dec=0; end
+        if isempty(dec); dec=0; end
         allResults(j,:) = [ meanValue dec t(iT) ];
         j = j+1;
     end
@@ -197,7 +222,7 @@ csvwrite(filename,allResults);
 
 %% Plot value sensitive values
 addpath('../plottinglibs/');
-suffix='-fixP'; % suffix='-varP';
+suffix='-fixP-singleDec'; %suffix='-varP';
 figure();
 clf;
 set(gcf, 'PaperUnits', 'inches');
@@ -217,7 +242,7 @@ for geo = [true false]
     else
         geoTitle = 'linear cost ';
     end
-    if suffix == '-fixP'
+    if contains(suffix, '-fixP')
         priorTitle = '- constant prior -';
     else
         priorTitle = '- variable prior -';
@@ -228,7 +253,6 @@ for geo = [true false]
 end
 filename = strcat('simFigs/value-sensitive',suffix,'.pdf');
 saveas(gcf,filename)
-
 
 %% Sim code
 numruns=1;
@@ -253,8 +277,10 @@ for run = 1:numruns
         r1i = findnearest(r1m, Sscale, -1);
         r2i = findnearest(r2m, Sscale, -1);
         r3i = findnearest(r3m, Sscale, -1);
-        simTraj = [simTraj; r1m r2m r3m D(r1i,r2i,r3i,iT) ];
-        %fprintf('For values (%d,%d) at time %d the D is %d\n',r1m,r2m, t(iT), D(r1i,r2i,iT) )
+        dec=D(r1i,r2i,r3i,iT);
+        if isempty(dec); dec=0; end
+        simTraj = [simTraj; r1m r2m r3m dec ];
+        %fprintf('For values (%d,%d,%d) at time %d the D is %d\n',r1m,r2m,r3m, t(iT), dec )
         if D(r1i,r2i,r3i,iT) ~= 4
             break
         else
@@ -266,6 +292,7 @@ for run = 1:numruns
     if plotResults
         %subplot(ceil(numruns/2),2,run); imagesc(Sscale, Sscale, D(:,:,iT), [1 3]); axis square; axis xy; title(['D(0) \rho=' num2str(rho_,3)]); xlabel(Slabel{1}); ylabel(Slabel{2});
         valscale = (r1m + r2m + r3m + Smax)/3;
+        %fprintf('valscale=%d',valscale);
         %valscale=0;
         dbIS = plotDecisionVolume(S, D(:,:,:,iT), [-Smax Smax] );
         hold on; plot3(simTraj(:,1),simTraj(:,2),simTraj(:,3),'k','linewidth',2);
@@ -338,6 +365,115 @@ end
 filename = strcat('simFigs/fullSim-geometric-',num2str(geometric),'_r1-',num2str(g{1}.meanR),'_r2-',num2str(g{2}.meanR),'_r3-',num2str(g{3}.meanR),'.pdf');
 %savefig(filename)
 saveas(gcf,filename)
+
+%% Visualise collapsing boundaries
+computeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
+singleDecisions=true; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
+cuttingPlanes=0:1:3; % cutting plane, the value corresponds to the sum of the expected rewards (r1+r2+r3)
+listOfTimes=1:100:601; % the snapshots of when to show the boundaries
+priorMean=1.5;
+if singleDecisions
+    singleDecisionsSuffix='-singleDec';
+else
+    singleDecisionsSuffix='-multiDec';
+end
+
+boundariesDataLoaded = false;
+
+% prepare the figure
+figure(); clf;
+set(gcf, 'PaperUnits', 'inches');
+set(gcf, 'PaperSize', [2+2*length(listOfTimes) 2+length(cuttingPlanes)*2]);
+set(gcf, 'PaperPositionMode', 'manual');
+set(gcf, 'PaperPosition', [0 0 2+2*length(listOfTimes) 2+length(cuttingPlanes)*2]);
+j=1; % counter for subplots
+for cuttingPlane = cuttingPlanes
+    valscale = cuttingPlane + (Smax/3); % moving to the correct 2d projection plane
+    for snapshot = listOfTimes
+        if geometric
+            filename = strcat('rawData/plane_geom-',num2str(geometric),'_rm-',num2str(priorMean),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_plane-',num2str(cuttingPlane),'_snap-',num2str(snapshot),'.mat');
+        else
+            filename = strcat('rawData/plane_geom-',num2str(geometric),'_rm-',num2str(priorMean),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_plane-',num2str(cuttingPlane),'_snap-',num2str(snapshot),'.mat');
+        end
+        % try to load the file
+        dataLoaded = false;
+        if ~computeDecisionBoundaries % load the projected boundaries
+            try
+                fprintf('loading projection...');
+                load(filename, 'dbIS');
+                dataLoaded = true;
+                fprintf('done.\n');
+            catch
+                disp('Could not load the projected boundaries. Recomputing the data.');
+            end
+        end
+        if ~dataLoaded % compute the projected boundaries
+            if geometric
+                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(priorMean),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'.mat');
+            else
+                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(priorMean),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'.mat');
+            end
+            if ~computeDecisionBoundaries && ~boundariesDataLoaded % load the decision threshold for all timesteps (matrix D)
+                try
+                    fprintf('loading boundaries...');
+                    load(filenameBounds, 'D','rho_');
+                    [S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
+                    boundariesDataLoaded = true;
+                    fprintf('done.\n');
+                catch
+                    disp('Could not load the decision matrix. Recomputing the data.');
+                end
+            end
+            if ~boundariesDataLoaded % compute the decision threshold for all timesteps
+                fprintf('computing boundaries...');
+                g{1}.meanR = priorMean; g{2}.meanR = priorMean; g{3}.meanR = priorMean; % fix prior of mean to a fixed value
+                if singleDecisions
+                    rho_ = 0; % we assume single decisions
+                else
+                    SscaleL  = linspace(-Smax, Smax, resSL);
+                    [SLow{1},SLow{2},SLow{3}] = ndgrid(SscaleL, SscaleL, SscaleL);
+                    iS0 = [findnearest(g{1}.meanR, SscaleL) findnearest(g{2}.meanR, SscaleL) findnearest(g{3}.meanR, SscaleL)]; % this line is not really needed
+                    for iC = 3:-1:1;  RhLow{iC} = utilityFunc(SLow{iC});  end  % Expected reward for option iC
+                    rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,RhLow,SLow,t,dt,iS0), g{1}.meanR); % compute future rewards decisions
+                    fprintf('rho for mean %d is %d...',g{1}.meanR, rho_);
+                end
+                
+                Sscale = linspace(-Smax, Smax, resS); % define the range of possible rewards
+                [S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
+                Rh{1} = utilityFunc(S{1}); % Expected reward for option 1
+                Rh{2} = utilityFunc(S{2}); % Expected reward for option 2
+                Rh{3} = utilityFunc(S{3}); % Expected reward for option 3
+                iS0 = [findnearest(g{1}.meanR, Sscale) findnearest(g{2}.meanR, Sscale) findnearest(g{3}.meanR, Sscale)]; % this line is not really needed
+                [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(rho_,c,tNull,g,Rh,S,t,dt,iS0);
+                boundariesDataLoaded=true;
+                fprintf('saving boundaries to file...');
+                save(filenameBounds,'D','rho_', '-v7.3');
+                fprintf('done.\n');
+            end
+            fprintf('computing projection...');
+            dbIS = compute3dBoundaries(S, D(:,:,:,snapshot)); % computing the projected boundaries on 2d plane
+            fprintf('saving projection to file...');
+            save(filename,'dbIS','-v7.3');
+            fprintf('done.\n');
+        end
+        
+        subplot(length(cuttingPlanes),length(listOfTimes),j); % select subplot
+        j=j+1;
+        for iD = 1:3
+            if isempty(dbIS{iD}) == 0 % scaling value may lead to null intersection with decision boundaries
+                line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
+                    [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
+                    'Color',myCol(iD,1:3),'LineWidth',1.5); hold on;
+            end
+        end
+        xlim([-Smax-1 Smax+1]); ylim([-Smax-1 Smax+1]); daspect([1 1 1]); % aspect ratio 1
+        title(['time=' num2str(t(snapshot)) ' -- \Sigma_i(r_i)=' num2str(cuttingPlane) ]);
+    end
+end
+fprintf('saving image to pdf...');
+filename = strcat('simFigs/collapsing_geom-',num2str(geometric),'_pm-',num2str(priorMean),'.pdf');
+saveas(gcf,filename)
+fprintf('done.\n');
 
 %% Plot Trajectory on 2d projection
 function plotTrajOnProjection(dbIS, simTraj, myCol)
@@ -505,10 +641,11 @@ function [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(rho_,c,tNu
 global gamm geometric;
 rho = rho_;                                                                        % Reward rate estimate
 [V(:,:,:,length(t)), D(:,:,:,length(t))] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull});       % Max V~ at time tmax
+if geometric; gammaStep = gamm^dt; end
 for iT = length(t)-1:-1:1
     [EVnext(:,:,:,iT), Ptrans{iT}, iStrans{iT}] = E(V(:,:,:,iT+1),S,t(iT),dt,g);                            % <V~(t+1)|S(t)> for waiting
     if geometric
-      [V(:,:,:,iT), D(:,:,:,iT)] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull, EVnext(:,:,:,iT)*gamm});       % (JARM 23rd August'19) [geometrically-discounted value (V~), decision] at time t    
+      [V(:,:,:,iT), D(:,:,:,iT)] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull, EVnext(:,:,:,iT)*gammaStep});       % (JARM 23rd August'19) [geometrically-discounted value (V~), decision] at time t    
     else
       [V(:,:,:,iT), D(:,:,:,iT)] = max_({Rh{1}-rho*tNull, Rh{2}-rho*tNull, Rh{3}-rho*tNull, EVnext(:,:,:,iT)-(rho+c)*dt});       % [Average-adjusted value (V~), decision] at time t
     end
