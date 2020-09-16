@@ -2,42 +2,59 @@ function valueDecisionBoundaryRR2_3D()
 global gamm geometric epsil pie; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
 geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
-gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
+gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
-maxval = 0.25; % (JARM 6th March '20) maximum utility for logistic utility function
-logslope = 5; % (JARM 6th March '20) slope parameter for logistic utility function
+maxval = 4; % (JARM 6th March '20) maximum utility for logistic utility function
+utility='linear';
 tic;
-Smax = 6;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
+Smax = 8;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
 resSL  = 15;      % Grid resolution of state space
 resS = 151;      % Grid resolution of state space
-tmax = 3;       % Time limit
-dt   = .005;       % Time step
-c    = 0.2;       % Cost of evidence accumulation
+tmax = 37;       % Time limit
+dt   = .0625;      % Time step for computing the decision matrix
+dtsim   = .005;    % Time step for computing the stochastic simulations
+c    = 0.1;       % Cost of evidence accumulation
 tNull = .25;     % Non-decision time + inter trial interval
 g{1}.meanR = 0; % Prior mean of state (dimension 1)
 g{1}.varR  = 5; % Prior variance of stte
-g{1}.varX  = 2 + (pie * valscale); % Observation noise variance
+g{1}.varX  = 2; % Observation noise variance
 g{2}.meanR = 0; % Prior mean of state (dimension 2)
 g{2}.varR  = 5; % Prior variance of state
-g{2}.varX  = 2 + (pie * valscale); % Observation noise variance
+g{2}.varX  = 2; % Observation noise variance
 g{3}.meanR = 0; % Prior mean of state (dimension 3)
 g{3}.varR  = 5; % Prior variance of state
-g{3}.varX  = 2 + (pie * valscale); % Observation noise variance
+g{3}.varX  = 2; % Observation noise variance
 t = 0:dt:tmax;
 Slabel = {'r_1^{hat}', 'r_2^{hat}', 'r_3^{hat}'};
 myCol = [1 0 0; 0 1 0; 0 0 1];
 
-%% Utililty function:
-utilityFunc = @(X) X;
-%utilityFunc = @(X) tanh(X);
-%utilityFunc = @(X) sign(X).*abs(X).^0.5;
-%utilityFunc = @(X) maxval./(1+exp(-logslope*(X)));
+% Utililty function:
+if contains(utility , 'linear')
+    utilityFunc = @(X) X;
+elseif contains(utility , 'tan')
+    utilityFunc = @(X) tanh(X);
+elseif contains(utility , 'logisticL')
+    logslope = 0.75; % slope parameter for logistic utility function
+    utilityFunc = @(X) maxval./(1+exp(-logslope*(X)));
+elseif contains(utility , 'logLm')
+    logslope = 0.75; % slope parameter for logistic utility function
+    utilityFunc = @(X) -maxval + maxval*2./(1+exp(-logslope*(X)));
+elseif contains(utility , 'logHm')
+    logslope = 1.5; % slope parameter for logistic utility function
+    utilityFunc = @(X) -maxval + maxval*2./(1+exp(-logslope*(X)));
+elseif contains(utility , 'logisticH')
+    logslope = 1.5; % slope parameter for logistic utility function
+    utilityFunc = @(X) maxval./(1+exp(-logslope*(X)));
+else
+    utilityFunc = @(X) sign(X).*abs(X).^0.5;
+end
 
-%figure;
-%x=(-2:0.1:2);
-%plot(x,utilityFunc(x));
+figure;
+x=(-Smax:0.1:Smax);
+plot(x,utilityFunc(x));
+saveas(gcf,['simFigs/' utility '.pdf'])
 
 %% Reward rate, Average-adjusted value, Decision (finding solution):
 SscaleL  = linspace(-Smax, Smax, resSL);
@@ -65,6 +82,10 @@ for iC = 3:-1:1;  Rh{iC} = utilityFunc(S{iC});  end                             
 % dbX = transformDecBound(dbS2,Sscale,t,g);
 
 %% Run set of tests to measure value-sensitivity in equal alternative case
+for utility = ["linear", "tan", "logLm", "logHm", "sqrt"] 
+for geo = [false true]
+%for geo = false
+if geo; geometric=true; else; geometric=false; end
 savePlots = false;
 updateMeanVarianceEachStep=false; % if true, it uses the posterior as prior mean and variance in the next dt observation
 computeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
@@ -87,7 +108,12 @@ if singleDecisions
 else
     singleDecisionsSuffix='-multiDec';
 end
-suffix=[priorMeanSuffix singleDecisionsSuffix];
+if geometric
+    cost=gamm;
+else
+    cost=c;
+end
+suffix=[priorMeanSuffix singleDecisionsSuffix '_u-' utility];
 
 Sscale = linspace(-Smax, Smax, resS); % define the range of possible rewards
 [S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
@@ -103,9 +129,9 @@ for meanValue = meanValues
     end
     option1Mean = meanValue; option2Mean = meanValue; option3Mean = meanValue; % set actual mean, from which the evidence data is drawn, equal for both options
     if geometric
-        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'.mat');
+        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
     else
-        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'.mat');
+        filename = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
     end
     dataLoaded = false;
     if priorMeanEqualToEvidenceDataMean || meanValue==meanValues(1) % skip loading/computing the decision matrix after the first loop if the prior remains the same (i.e. priorMeanEqualToEvidenceDataMean==false)
@@ -159,7 +185,8 @@ for meanValue = meanValues
             r3v = g{3}.varR; % var opt 3
         end
         simTraj = [ ];
-        for iT = 1:1:length(t)-1
+        for simT = 0:dtsim:tmax %iT = 1:1:length(t)-1
+            iT = findnearest(simT, t);
             if updateMeanVarianceEachStep
                 r1v = (r1v * g{1}.varX) / ( g{1}.varX + t(iT) * r1v ); % compute the posterior variance for op 1
                 r2v = (r2v * g{2}.varX) / ( g{2}.varX + t(iT) * r2v ); % compute the posterior variance for op 2
@@ -188,9 +215,9 @@ for meanValue = meanValues
             if decisionMade
                 break
             else
-                r1sum = r1sum + normrnd(option1Mean*dt, sqrt(g{1}.varX*dt));
-                r2sum = r2sum + normrnd(option2Mean*dt, sqrt(g{2}.varX*dt));
-                r3sum = r3sum + normrnd(option3Mean*dt, sqrt(g{3}.varX*dt));
+                r1sum = r1sum + normrnd(option1Mean*dtsim, sqrt(g{1}.varX*dtsim)+pie*(r1sum^2));
+                r2sum = r2sum + normrnd(option2Mean*dtsim, sqrt(g{2}.varX*dtsim)+pie*(r2sum^2));
+                r3sum = r3sum + normrnd(option3Mean*dtsim, sqrt(g{3}.varX*dtsim)+pie*(r3sum^2));
             end
         end
         if savePlots
@@ -217,12 +244,16 @@ for meanValue = meanValues
         saveas(gcf,filename)
     end
 end
-filename = strcat('resultsData/vs_geometric-',num2str(geometric),suffix,'.txt');
+filename = strcat('resultsData/vs_geometric-',num2str(geometric),strjoin(suffix,''),'_c-',num2str(cost),'.txt');
 csvwrite(filename,allResults);
+end
+end
 
-%% Plot value sensitive values
+%% Plot value sensitive comparison
+for utility = ["linear", "tan", "logLm", "logHm", "sqrt"]
 addpath('../plottinglibs/');
-suffix='-fixP-singleDec'; %suffix='-varP';
+suffix1=strcat('-fixP-singleDec_u-',utility,'_c-'); %suffix='-varP';
+fprintf("%s\n",suffix1);
 figure();
 clf;
 set(gcf, 'PaperUnits', 'inches');
@@ -230,6 +261,8 @@ set(gcf, 'PaperSize', [8 4]);
 set(gcf, 'PaperPositionMode', 'manual');
 set(gcf, 'PaperPosition', [0 0 8 4]);
 for geo = [true false]
+    if geo; cost=gamm; else; cost=c; end
+    suffix=strjoin([suffix1 num2str(cost)],'');
     filename = strcat('resultsData/vs_geometric-',num2str(geo),suffix,'.txt');
     allResults = readtable(filename);
     fprintf('Loaded file %s with %d lines.\n', filename, height(allResults)/length(meanValues));
@@ -251,8 +284,405 @@ for geo = [true false]
     %violin(dataForPlot,'xlabel',string(meanValues))
     subplot(2,2,3+geo); distributionPlot(dataForPlot,'histOpt',1,'colormap',spring,'xValues',meanValues); title(['3n - ' geoTitle priorTitle ' all data']);
 end
-filename = strcat('simFigs/value-sensitive',suffix,'.pdf');
+filename = strcat('simFigs/value-sensitive',strrep(suffix,'.',''),'.pdf');
 saveas(gcf,filename)
+
+figure();
+clf;
+set(gcf, 'PaperUnits', 'inches');
+set(gcf, 'PaperSize', [8 4]);
+set(gcf, 'PaperPositionMode', 'manual');
+set(gcf, 'PaperPosition', [0 0 8 4]);
+ymin=1000; ymax=0;
+for geo = [false true]
+    if geo; cost=gamm; else; cost=c; end
+    suffix=strjoin([suffix1 num2str(cost)],'');
+    filename = strcat('resultsData/vs_geometric-',num2str(geo),suffix,'.txt');
+    allResults = readtable(filename);
+    fprintf('Loaded file %s with %d lines.\n', filename, height(allResults)/length(meanValues));
+    dataForPlot = [];
+    for meanValue = meanValues
+        dataForPlot = [ dataForPlot, allResults{ allResults{:,1} == meanValue, 3}];
+    end
+    hold on; errorbar(meanValues, mean(dataForPlot), std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*1.96,'LineWidth', 3);
+    ymin = min(ymin, min(mean(dataForPlot)-std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*3) );
+    ymax = max(ymax, max(mean(dataForPlot)+std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*3) );
+end
+epsilon=(max(meanValues)-min(meanValues))*0.05;
+axis([min(meanValues)-epsilon max(meanValues)+epsilon ymin ymax]);
+legend('Linear cost','Geometric cost','FontSize',13)%,'Location','east')
+xlabel('Stimuli''s magnitude')
+ylabel('Reaction time')
+set(gca,'FontSize',13)
+pbaspect([3 2 2])
+filename = strcat('simFigs/vs-comp',strrep(suffix,'.',''),'.pdf');
+saveas(gcf,filename);
+end
+
+%% Plot all in one RT-value
+figure();
+clf;
+set(gcf, 'PaperUnits', 'inches');
+set(gcf, 'PaperSize', [8 4]);
+set(gcf, 'PaperPositionMode', 'manual');
+set(gcf, 'PaperPosition', [0 0 8 4]);
+ymin=1000; ymax=0;
+for utility = ["linear", "tan", "logLm", "logHm", "sqrt"]
+    suffix1=['-fixP-singleDec_u-' utility '_c-'];
+    if contains(utility , 'linear'); col='k';
+    elseif contains(utility , 'tan'); col='b';
+    elseif contains(utility , 'logLm'); col='g';
+    elseif contains(utility , 'logHm'); col='r';
+    elseif contains(utility , 'sqrt'); col='m'; end
+    for geo = [false true]
+        if geo; cost=gamm; else; cost=c; end
+        if geo; lstyle='-'; else; lstyle='--'; end
+        suffix=[suffix1 num2str(cost)];
+        filename = strcat('resultsData/vs_geometric-',num2str(geo),strjoin(suffix,''),'.txt');
+        allResults = readtable(filename);
+        fprintf('Loaded file %s with %d lines.\n', filename, height(allResults)/length(meanValues));
+        dataForPlot = [];
+        for meanValue = meanValues
+            dataForPlot = [ dataForPlot, allResults{ allResults{:,1} == meanValue, 3}];
+        end
+        hold on; errorbar(meanValues, mean(dataForPlot), std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*1.96,'LineWidth', 3, 'Linestyle', lstyle, 'Color', col);
+        ymin = min(ymin, min(mean(dataForPlot)-std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*3) );
+        ymax = max(ymax, max(mean(dataForPlot)+std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*3) );
+    end
+end
+epsilon=(max(meanValues)-min(meanValues))*0.05;
+axis([min(meanValues)-epsilon max(meanValues)+epsilon ymin ymax]);
+h = zeros(5, 1);
+h(1) = plot(NaN,NaN,'ok','MarkerFaceColor','k');
+h(2) = plot(NaN,NaN,'ob','MarkerFaceColor','b');
+h(3) = plot(NaN,NaN,'og','MarkerFaceColor','g');
+h(4) = plot(NaN,NaN,'or','MarkerFaceColor','r');
+h(5) = plot(NaN,NaN,'om','MarkerFaceColor','m');
+legend(h, "linear", "tan", "low logistic", "high logistic", "sqrt",'FontSize',9,'Orientation','horizontal','Position',[0.48,0.8,0.1,0.05]);
+xlabel('Stimuli''s magnitude')
+ylabel('Reaction time')
+set(gca,'FontSize',16)
+pbaspect([3 2 2])
+filename = 'simFigs/vs-all-in-one.pdf';
+saveas(gcf,filename);
+
+%% Plot value sensitive RT 
+addpath('../plottinglibs/');
+geo=false;
+geo=true;
+if geo; cost=gamm; else; cost=c; end
+suffix=['-fixP-singleDec_u-sqrt_c-' num2str(cost)]; %suffix='-varP';
+figure();
+clf;
+set(gcf, 'PaperUnits', 'inches');
+set(gcf, 'PaperSize', [8 4]);
+set(gcf, 'PaperPositionMode', 'manual');
+set(gcf, 'PaperPosition', [0 0 8 4]);
+filename = strcat('resultsData/vs_geometric-',num2str(geo),suffix,'.txt');
+allResults = readtable(filename);
+fprintf('Loaded file %s with %d lines.\n', filename, height(allResults)/length(meanValues));
+dataForPlot = [];
+for meanValue = meanValues
+    dataForPlot = [ dataForPlot, allResults{ allResults{:,1} == meanValue, 3}];
+end
+if geo == true
+    geoTitle = 'geom. cost ';
+else
+    geoTitle = 'linear cost ';
+end
+if contains(suffix, '-fixP')
+    priorTitle = '- constant prior -';
+else
+    priorTitle = '- variable prior -';
+end
+errorbar(meanValues, mean(dataForPlot), std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*1.96,'LineWidth', 3);
+%title(['3n - ' geoTitle priorTitle ' mean']);
+epsilon=(max(meanValues)-min(meanValues))*0.05;
+axis([min(meanValues)-epsilon max(meanValues)+epsilon min(mean(dataForPlot)-std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*3) max(mean(dataForPlot)+std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*3)]);
+xlabel('Stimuli''s magnitude')
+ylabel('Reaction time')
+set(gca,'FontSize',13)
+pbaspect([3 2 2])
+%violin(dataForPlot,'xlabel',string(meanValues))
+%distributionPlot(dataForPlot,'histOpt',1,'colormap',bone,'xValues',meanValues); title(['3n - ' geoTitle priorTitle ' all data']);
+filename = strcat('simFigs/vs-g',num2str(geo),strrep(suffix,'.',''),'.pdf');
+saveas(gcf,filename);
+%system(['/Library/TeX/texbin/pdfcrop ' filename ' ' filename ]);
+
+%% Plot boundaries for varying time and magnitude
+for utility = ["linear"]%, "tan", "logLm", "logHm", "sqrt"] % WARNING ** This loop works only for plotting NOT for computing
+magnitudePlot=true;
+computeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
+singleDecisions=true; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
+meanValues=-0.5:1:2.5; % mean reward values to be tested 
+timeSnaps=0:0.333:1; % mean reward values to be tested
+timeSnaps=0:0.25:0.75;
+%timeSnaps=0:0.25:0.;
+if contains( ['tan','logHm'],utility )
+    %timeSnaps=0:0.1:0.3; % mean reward values to be tested are different
+    timeSnaps=0:0.25:0.75; % mean reward values to be tested are different
+elseif contains( 'logLm',utility )
+    %timeSnaps=0:0.2:0.6; % mean reward values to be tested are different
+    timeSnaps=0:0.25:0.75; % mean reward values to be tested are different
+end
+%meanValues=-0.5:0.5:0.5; 
+%meanValues=1.5;
+%timeSnaps=0.3;
+
+% prepare plot
+figure(); clf;
+set(gcf, 'PaperUnits', 'inches');
+if magnitudePlot
+    set(gcf, 'PaperSize', [1+length(timeSnaps)*3 6]);
+else
+    set(gcf, 'PaperSize', [1+length(timeSnaps)*1.5 1+length(meanValues)*1]);
+end
+set(gcf, 'PaperPositionMode', 'manual');
+if magnitudePlot
+    set(gcf, 'PaperPosition', [0 0 1+length(timeSnaps)*3 6]);
+else
+    set(gcf, 'PaperPosition', [0 0 1+length(timeSnaps)*1.5 1+length(meanValues)*1]);
+end
+
+%for geo = [false true]
+for geo = false
+if geo; geometric=true; else; geometric=false; end
+priorMeanSuffix='-fixP';
+if singleDecisions
+    singleDecisionsSuffix='-singleDec';
+else
+    singleDecisionsSuffix='-multiDec';
+end
+if geometric
+    cost=gamm;
+else
+    cost=c;
+end
+suffix=[priorMeanSuffix singleDecisionsSuffix '_u-' utility];
+
+Sscale = linspace(-Smax, Smax, resS); % define the range of possible rewards
+[S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
+Rh{1} = utilityFunc(S{1}); % Expected reward for option 1
+Rh{2} = utilityFunc(S{2}); % Expected reward for option 2
+Rh{3} = utilityFunc(S{3}); % Expected reward for option 3
+boundariesDataLoaded = false; % flag for loading files
+valk=0;
+for meanValue = meanValues
+    valk=valk+1;
+    fixedMeanValue = 1.5;
+    g{1}.meanR = fixedMeanValue; g{2}.meanR = fixedMeanValue; g{3}.meanR = fixedMeanValue; % fix prior of mean to a fixed value
+    valscale = (3*meanValue + Smax)/3; % moving to the correct 2d projection plane
+    timetk=0;
+    if magnitudePlot || valk==1 
+        j=1 + length(timeSnaps)*(geo&&magnitudePlot); % subplot counter
+    end
+    for timeSnap = timeSnaps
+        iT=findnearest(timeSnap,t);
+        if geometric
+            filename = strcat('rawData/plane_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'_plane-',num2str(meanValue),'_snap-',num2str(iT),'.mat');
+        else
+            filename = strcat('rawData/plane_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'_plane-',num2str(meanValue),'_snap-',num2str(iT),'.mat');
+        end
+        % try to load the file
+        dataLoaded = false;
+        if ~computeDecisionBoundaries % load the projected boundaries
+            try
+                fprintf('loading projection...');
+                load(filename, 'dbIS');
+                dataLoaded = true;
+                fprintf('done.\n');
+            catch
+                disp('Could not load the projected boundaries. Recomputing the data.');
+            end
+        end
+        if ~dataLoaded % compute the projected boundaries
+            if geometric
+                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
+            else
+                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
+            end
+            if ~computeDecisionBoundaries && ~boundariesDataLoaded % load the decision threshold for all timesteps (matrix D)
+                try
+                    fprintf('loading boundaries...');
+                    load(filenameBounds, 'D','rho_');
+                    [S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
+                    boundariesDataLoaded = true;
+                    fprintf('done.\n');
+                catch
+                    disp('Could not load the decision matrix. Recomputing the data.');
+                end
+            end
+            if ~boundariesDataLoaded % compute the decision threshold for all timesteps
+                fprintf('computing boundaries...');
+                if singleDecisions
+                    rho_ = 0; % we assume single decisions
+                else
+                    SscaleL  = linspace(-Smax, Smax, resSL);
+                    [SLow{1},SLow{2},SLow{3}] = ndgrid(SscaleL, SscaleL, SscaleL);
+                    iS0 = [findnearest(g{1}.meanR, SscaleL) findnearest(g{2}.meanR, SscaleL) findnearest(g{3}.meanR, SscaleL)]; % this line is not really needed
+                    for iC = 3:-1:1;  RhLow{iC} = utilityFunc(SLow{iC});  end  % Expected reward for option iC
+                    rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,RhLow,SLow,t,dt,iS0), g{1}.meanR); % compute future rewards decisions
+                    fprintf('rho for mean %d is %d...',g{1}.meanR, rho_);
+                end
+                iS0 = [findnearest(g{1}.meanR, Sscale) findnearest(g{2}.meanR, Sscale) findnearest(g{3}.meanR, Sscale)]; % this line is useless
+                [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(rho_,c,tNull,g,Rh,S,t,dt,iS0);
+                boundariesDataLoaded=true;
+                fprintf('saving boundaries to file...');
+                save(filenameBounds,'D','rho_', '-v7.3');
+                fprintf('done.\n');
+            end
+            fprintf('computing projection...');
+            dbIS = compute3dBoundaries(S, D(:,:,:,iT)); % computing the projected boundaries on 2d plane
+            fprintf('saving projection to file...');
+            save(filename,'dbIS','-v7.3');
+            fprintf('done.\n');
+        end
+        % select subplot
+        if magnitudePlot
+        	subplot(2,length(timeSnaps),j); % select subplot
+        else
+            subplot(length(meanValues),length(timeSnaps),j); % select subplot
+        end
+        
+        % convert to ternary plot coordinates
+        for iD = 3:-1:1 
+            if isempty(dbIS{iD}.vertices) == 0 
+                dbIS{iD}.vertices2d = [ [ Smax/2 + (dbIS{iD}.vertices(:,2)-valscale) + (dbIS{iD}.vertices(:,3)-valscale)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * (dbIS{iD}.vertices(:,3)-valscale))/2] ]; % convert to ternary plot coordinates
+                %dbIS{iD}.vertices2d = [ [ Smax + (dbIS{iD}.vertices(:,2)-valscale) + (dbIS{iD}.vertices(:,3)-valscale)*0.5] [ Smax/(sqrt(3)) + (sqrt(3) * (dbIS{iD}.vertices(:,3)-valscale))/2] ]; % convert to ternary plot coordinates
+                %dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
+            end
+        end
+        
+        % compute external triangle cropping at Smax/2
+        zoom=Smax/3;
+        attractor.vertices = [[zoom;-zoom;-zoom] + valscale, [-zoom;zoom;-zoom] + valscale, [-zoom;-zoom;zoom] + valscale]; 
+        %attractor.vertices = [[Smax/2;-Smax/2;-Smax/2] + valscale, [-Smax/2;Smax/2;-Smax/2] + valscale, [-Smax/2;-Smax/2;Smax/2] + valscale]; 
+        triang = [ [ zoom/(2) + (attractor.vertices(:,2)-valscale) + (attractor.vertices(:,3)-valscale)/2] [ zoom/(2*sqrt(3)) + (sqrt(3) * (attractor.vertices(:,3)-valscale))/2] ];
+        vax = triang(1,1);  vay = triang(1,2); vbx = triang(2,1);  vby = triang(2,2); vcx = triang(3,1);  vcy = triang(3,2); % the ternary plot triangle vertices
+        if ~magnitudePlot; patch([vax vbx vbx vax],[vay vay vcy vcy],'w','EdgeColor','none'); end % white background
+        
+        % plot the boundaries
+        j=j+1;
+        for iD = 1:3
+            if isempty(dbIS{iD}) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+                if magnitudePlot
+                    colour = 1-((valk/length(meanValues)) *[1 1 1]);
+                else
+                    colour = myCol(iD,1:3);
+                end
+                line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
+                    [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
+                    'Color',colour,'LineWidth',2); hold on;
+            end
+        end
+        %text(0,0,['t=' num2str(t(iT)) ' v=' num2str(meanValue)],'FontSize',10)
+        
+        % plot the external triangle
+        patch([vax vcx vax],[vay vcy vcy],'w','EdgeColor','w','LineWidth',2); % clear out the line outside the triangle
+        patch([vbx vcx vbx],[vby vcy vcy],'w','EdgeColor','w','LineWidth',2); % clear out the line outside the triangle
+        line([vax vbx vcx vax], [vay vby vcy vay], 'Color',.5*[1 1 1],'LineWidth',1.5); 
+        axis([vax vbx vay vcy ])
+        %axis([-0.5 0.5 -0.5 0.5 ])
+        set(gca,'visible','off') % remove axes
+        daspect([1 1 1]); % aspect ratio 1
+        
+        % setting the time ticks
+        if (valk==1)
+            if magnitudePlot; x = 0.24*(timetk)+.03; txtsize=16; else; x = 0.22*(timetk)+.09;; txtsize=13; end
+            
+            timetk=timetk+1;
+            annotation('ellipse', [0.055+x+0.06, 0.92, 0.01, 0.01], 'Color', 'k', 'FaceColor', 'k', 'LineWidth', 2, 'Units', 'normalized');
+            annotation('textbox', [0.015+x+0.06, 0.81, 0.1, 0.1], 'String', num2str(t(iT)), 'EdgeColor', 'none', 'FontSize', txtsize, 'HorizontalAlignment', 'center');
+        end
+    end
+end
+end
+ha=get(gcf,'children');
+% Positioning the subplots and vertical ticks
+if ~magnitudePlot
+    for i = 1:length(meanValues)
+        if magnitudePlot; break; end
+        y = 0.12+0.25*(i-1);
+        annotation('ellipse', [0.095, y+0.125, 0.01, 0.01], 'Color', 'k', 'FaceColor', 'k', 'LineWidth', 2, 'Units', 'normalized');
+        annotation('textbox', [0.085, y+0.06, 0.1, 0.1], 'String', num2str(meanValues(length(meanValues)-i+1)), 'EdgeColor', 'none', 'FontSize', 13, 'HorizontalAlignment', 'center');
+        for j = 1:length(timeSnaps)
+            x = 0.22*(4-j)+.1;
+            set(ha((i-1)*4+j),'position',[ x y .23 .23]); %set subplot positions
+        end
+    end
+else
+    for i = 1:2
+        y = 0.02+0.405*(i-1);
+        for j = 1:length(timeSnaps)
+            x = 0.24*(4-j)-0.05;
+            %fprintf("%f\n",x);
+            set(ha((i-1)*4+j),'position',[ x y .4 .4]); %set subplot positions
+        end
+    end
+end
+%Arrows and labels
+annotation('arrow', [0.11,0.95],[0.93,0.93],  'LineWidth', 3, 'Color', 'k');
+if magnitudePlot; x=0.07; else; x=0.15; end
+annotation('textbox', [x, 0.91, 0.1, 0.1], 'String', 'Time', 'EdgeColor', 'none', 'FontSize', 18, 'HorizontalAlignment', 'center');
+if ~magnitudePlot
+    stringlist=['V','a','l','u','e'];
+    annotation('arrow', [0.1,0.1],[0.92,0.12],  'LineWidth', 3, 'Color', 'k');
+else
+    stringlist=['L','i','n','e','a','r'];
+    stringlist2=['G','e','o','m','e','t','r','i','c'];
+    for i = 1:length(stringlist2)
+        annotation('textbox', [0, 0.43-(i*0.045), 0.05, 0.05], 'String', stringlist2(i), 'EdgeColor', 'none', 'FontSize', 18, 'HorizontalAlignment', 'center' );
+    end
+end
+for i = 1:length(stringlist)
+    annotation('textbox', [~magnitudePlot*0.05, 0.85-(i*0.045), 0.05, 0.05], 'String', stringlist(i), 'EdgeColor', 'none', 'FontSize', 18, 'HorizontalAlignment', 'center' );
+end
+%Save file
+if magnitudePlot; sfx=''; else sfx='-mp'; end
+outfilename = strcat('simFigs/vs-matrix',sfx,'-g',num2str(geometric),strjoin(strrep(suffix,'.',''),''),'.pdf');
+set(gcf,'Color',[1 1 1]); set(gca,'Color',[.8 .8 .8]); set(gcf,'InvertHardCopy','off');
+saveas(gcf,outfilename)
+end
+
+%% test one plot 
+clf()
+
+Smax=max(max(max(S{1})));
+attractor.vertices = [[Smax;-Smax;-Smax] + valscale, [-Smax;Smax;-Smax] + valscale, [-Smax;-Smax;Smax] + valscale]; % (JARM 7th October '19 move triangle along diagonal as option values scale)
+attractor.faces = [1 2 3; 1 2 3; 1 2 3];
+for iD = 3:-1:1
+    %[~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
+    if isempty(dbIS{iD}.vertices) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+        %norma = @(a) a./norm(a); % define function to normalise vectors to length 1
+        %prjMat=[ norma( cross([1 1 1], [1 2 4]) ); norma( cross( cross([1 1 1],[1 2 4]),[1,1,1]) )]; % compute the projection matrix to project the 3d coordinated onto the 2d plane ortogonal to the diagonal
+        %dbIS{iD}.vertices2d = (prjMat * (dbIS{iD}.vertices(:,1:3)-valscale).').'; % project the 3d boundaries onto the 2d projection plane
+        dbIS{iD}.vertices2d = [ [ Smax/2 + (dbIS{iD}.vertices(:,2)-valscale) + (dbIS{iD}.vertices(:,3)-valscale)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * (dbIS{iD}.vertices(:,3)-valscale))/2] ]; % convert to ternary plot coordinates
+        %dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
+    end
+end
+
+%triang = [ [ Smax/2 + (attractor.vertices(:,2)-valscale) + (attractor.vertices(:,3)-valscale)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * (attractor.vertices(:,3)-valscale))/2] ];
+attractor.vertices = [[Smax/2;-Smax/2;-Smax/2] + valscale, [-Smax/2;Smax/2;-Smax/2] + valscale, [-Smax/2;-Smax/2;Smax/2] + valscale]; 
+triang = [ [ Smax/4 + (attractor.vertices(:,2)-valscale) + (attractor.vertices(:,3)-valscale)*0.5] [ Smax/(4*sqrt(3)) + (sqrt(3) * (attractor.vertices(:,3)-valscale))/2] ]; 
+vax = triang(1,1);  vay = triang(1,2);
+vbx = triang(2,1);  vby = triang(2,2);
+vcx = triang(3,1);  vcy = triang(3,2);
+patch([vax vbx vbx vax],[vay vay vcy vcy],'w','EdgeColor','none'); % white background
+
+for iD = 1:3
+    if isempty(dbIS{iD}) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+        line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
+            [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
+            'Color',myCol(iD,1:3),'LineWidth',2); hold on;
+    end
+end
+
+patch([vax vcx vax],[vay vcy vcy],'w','EdgeColor','none'); % clear out the line outside the triangle
+patch([vbx vcx vbx],[vby vcy vcy],'w','EdgeColor','none'); % clear out the line outside the triangle
+line([vax vbx vcx vax], [vay vby vcy vay], 'Color',.5*[1 1 1],'LineWidth',1.5);
+axis([vax vbx vay vcy ])
+daspect([1 1 1]); % aspect ratio 1
+set(gca,'visible','off')
 
 %% Sim code
 numruns=1;
@@ -270,7 +700,8 @@ for run = 1:numruns
     r2sum=0;
     r3sum=0;
     simTraj = [ ];
-    for iT = 1:1:length(t)-1
+    for simT = 0:dtsim:tmax
+        iT = findnearest(simT, t);
         r1m = ( (g{1}.meanR * g{1}.varX) + (r1sum * g{1}.varR) ) / (g{1}.varX + t(iT) * g{1}.varR );
         r2m = ( (g{2}.meanR * g{2}.varX) + (r2sum * g{2}.varR) ) / (g{2}.varX + t(iT) * g{2}.varR );
         r3m = ( (g{3}.meanR * g{3}.varX) + (r3sum * g{3}.varR) ) / (g{3}.varX + t(iT) * g{3}.varR );
@@ -284,9 +715,9 @@ for run = 1:numruns
         if D(r1i,r2i,r3i,iT) ~= 4
             break
         else
-            r1sum = r1sum + normrnd(g{1}.meanR*dt, sqrt(g{1}.varX*dt));
-            r2sum = r2sum + normrnd(g{2}.meanR*dt, sqrt(g{2}.varX*dt));
-            r3sum = r3sum + normrnd(g{3}.meanR*dt, sqrt(g{3}.varX*dt));
+            r1sum = r1sum + normrnd(g{1}.meanR*dtsim, sqrt(g{1}.varX*dtsim));
+            r2sum = r2sum + normrnd(g{2}.meanR*dtsim, sqrt(g{2}.varX*dtsim));
+            r3sum = r3sum + normrnd(g{3}.meanR*dtsim, sqrt(g{3}.varX*dtsim));
         end
     end
     if plotResults
