@@ -5,6 +5,7 @@ global valscale; % (JARM 7th October '19)
 geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards
 fprintf("Script started with utlity %s and geometric %d\n",utility, geometric)
 gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards
+gamm = 0.01; % Original value
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
@@ -12,10 +13,14 @@ maxval = 4; % (JARM 6th March '20) maximum utility for logistic utility function
 %utility='tan';
 tic;
 Smax = 8;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
+Smax = 4;      % Original value
 resSL  = 15;      % Grid resolution of state space
 resS = 151;      % Grid resolution of state space
+resS = 101;      % Original value
 tmax = 37;       % Time limit
+tmax = 3;       % Original value
 dt   = .0625;       % Time step
+dt   = .05;       % Original value
 c    = 0.1;       % Cost of evidence accumulation
 tNull = .25;     % Non-decision time + inter trial interval
 g{1}.meanR = 0; % Prior mean of state (dimension 1)
@@ -64,10 +69,10 @@ else
     utilityFunc = @(X) sign(X).*abs(X).^0.5;
 end
 
-% Plot boundaries for varying time and magnitude
+% Compute boundaries for varying time and magnitude
 computeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
 singleDecisions=true; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
-meanValues=-0.5:1:2.5; % mean reward values to be tested
+meanValues=-0.5:1:1.5; % mean reward values to be tested
 timeSnaps=0:0.333:1; % mean reward values to be tested
 timeSnaps=0:0.25:0.75;
 if contains( ['tan','logHm'],utility )
@@ -79,7 +84,6 @@ end
 %meanValues=-0.5:0.5:0.5;
 %meanValues=1.5;
 %timeSnaps=0.3;
-j=1; % subplot counter
 
 priorMeanSuffix='-fixP';
 if singleDecisions
@@ -194,11 +198,11 @@ attractor.faces = [1 2 3; 1 2 3; 1 2 3];
 for iD = 3:-1:1
     [~, dbIS{iD}] = SurfaceIntersection(db{iD}, attractor);
     if isempty(dbIS{iD}.vertices) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
-        norma = @(a) a./norm(a); % define function to normalise vectors to length 1
-        prjMat=[ norma( cross([1 1 1], [1 2 4]) ); norma( cross( cross([1 1 1],[1 2 4]),[1,1,1]) )]; % compute the projection matrix to project the 3d coordinated onto the 2d plane ortogonal to the diagonal
-        dbIS{iD}.vertices2d = (prjMat * (dbIS{iD}.vertices(:,1:3)-valscale).').'; % project the 3d boundaries onto the 2d projection plane
+        %norma = @(a) a./norm(a); % define function to normalise vectors to length 1
+        %prjMat=[ norma( cross([1 1 1], [1 2 4]) ); norma( cross( cross([1 1 1],[1 2 4]),[1,1,1]) )]; % compute the projection matrix to project the 3d coordinated onto the 2d plane ortogonal to the diagonal
+        %dbIS{iD}.vertices2d = (prjMat * (dbIS{iD}.vertices(:,1:3)-valscale).').'; % project the 3d boundaries onto the 2d projection plane
         %dbIS{iD}.vertices2d = [ [ Smax/2 + (dbIS{iD}.vertices(:,2)-valscale) + (dbIS{iD}.vertices(:,3)-valscale)*0.5] [ Smax/(2*sqrt(3)) + (sqrt(3) * (dbIS{iD}.vertices(:,3)-valscale))/2] ]; % convert to ternary plot coordinates
-        %dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
+        dbIS{iD}.vertices2d = (dbIS{iD}.vertices - valscale) * [1/sqrt(2) -1/sqrt(2) 0; -1/sqrt(3) -1/sqrt(3) 1/sqrt(3); 0 0 0]'; % (JARM 13th October '19) correct projection of decision thresholds when values scale
     end
 end
 return

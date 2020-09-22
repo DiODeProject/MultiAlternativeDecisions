@@ -3,6 +3,7 @@ global gamm geometric epsil pie; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
 geometric = true; % (JARM 23rd August '19) use geometric discounting for future rewards 
 gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards 
+gamm = 0.01; % Original value
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
@@ -10,10 +11,14 @@ maxval = 4; % (JARM 6th March '20) maximum utility for logistic utility function
 utility='linear';
 tic;
 Smax = 8;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
+Smax = 4;      % Original value
 resSL  = 15;      % Grid resolution of state space
 resS = 151;      % Grid resolution of state space
+resS = 101;      % Original value
 tmax = 37;       % Time limit
+tmax = 3;       % Original value
 dt   = .0625;      % Time step for computing the decision matrix
+dt   = .05;       % Original value
 dtsim   = .005;    % Time step for computing the stochastic simulations
 c    = 0.1;       % Cost of evidence accumulation
 tNull = .25;     % Non-decision time + inter trial interval
@@ -414,7 +419,7 @@ for utility = ["linear"]%, "tan", "logLm", "logHm", "sqrt"] % WARNING ** This lo
 magnitudePlot=true;
 computeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
 singleDecisions=true; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
-meanValues=-0.5:1:2.5; % mean reward values to be tested 
+meanValues=-0.5:1:1.5; % mean reward values to be tested 
 timeSnaps=0:0.333:1; % mean reward values to be tested
 timeSnaps=0:0.25:0.75;
 %timeSnaps=0:0.25:0.;
@@ -444,8 +449,8 @@ else
     set(gcf, 'PaperPosition', [0 0 1+length(timeSnaps)*1.5 1+length(meanValues)*1]);
 end
 
-%for geo = [false true]
-for geo = false
+for geo = [false true]
+%for geo = false
 if geo; geometric=true; else; geometric=false; end
 priorMeanSuffix='-fixP';
 if singleDecisions
