@@ -1,17 +1,18 @@
-function valueDecisionBoundaryRR2_3D()
+ function valueDecisionBoundaryRR2_3D()
 global gamm geometric epsil pie; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
 geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
-gamm = 0.8; % (JARM 23rd August '19) geometric discount factor for future rewards 
+singledecisions = true; % (JARM 24th September '20) do not optimise for reward rate
+gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards 
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
-pie = 1; % (JARM 27th May '20) input-dependent noise scaling 
-valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
+pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
+valscale = 2; % (JARM 7th October '19) move triangle along diagonal as option values scale)
 maxval = 0.25; % (JARM 6th March '20) maximum utility for logistic utility function
 logslope = 5; % (JARM 6th March '20) slope parameter for logistic utility function
 tic;
 Smax = 4;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
-resSL  = 15;      % Grid resolution of state space
-resS = 101;      % Grid resolution of state space
+resSL  = 15;      % Grid resolution of state space (low resolution)
+resS = 101;      % Grid resolution of state space (high resolution)
 tmax = 3;       % Time limit
 dt   = .05;       % Time step
 c    = 0.1;       % Cost of evidence accumulation
@@ -40,16 +41,20 @@ x=(-2:0.1:2);
 plot(x,utilityFunc(x));
 
 %% Reward rate, Average-adjusted value, Decision (finding solution):
-SscaleL  = linspace(-Smax, Smax, resSL);
-[S{1},S{2},S{3}] = ndgrid(SscaleL, SscaleL, SscaleL);
-iS0 = [findnearest(g{1}.meanR, SscaleL) findnearest(g{2}.meanR, SscaleL) findnearest(g{3}.meanR, SscaleL)];
-for iC = 3:-1:1;  Rh{iC} = utilityFunc(S{iC});  end                                                          % Expected reward for option iC
-[RhMax, Dd] = max_({Rh{1}, Rh{2}, Rh{3}});                                                                   % Expected reward for decision
-[V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(g{1}.meanR,c,tNull,g,Rh,S,t,dt,iS0);
-if geometric == false
-    rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR)                            % Reward rate
+if singledecisions
+    rho_ = 0;
 else
-    rho_ = 0; % (JARM 20th September '19) reward rate optimisation does not currently converge for geometric discounting
+    SscaleL  = linspace(-Smax, Smax, resSL);
+    [S{1},S{2},S{3}] = ndgrid(SscaleL, SscaleL, SscaleL);
+    iS0 = [findnearest(g{1}.meanR, SscaleL) findnearest(g{2}.meanR, SscaleL) findnearest(g{3}.meanR, SscaleL)];
+    for iC = 3:-1:1;  Rh{iC} = utilityFunc(S{iC});  end                                                          % Expected reward for option iC
+    [RhMax, Dd] = max_({Rh{1}, Rh{2}, Rh{3}});                                                                   % Expected reward for decision
+    [V0, V, D, EVnext, rho, Ptrans, iStrans] = backwardInduction(g{1}.meanR,c,tNull,g,Rh,S,t,dt,iS0);
+    if geometric == false
+        rho_ = fzero(@(rho) backwardInduction(rho,c,tNull,g,Rh,S,t,dt,iS0), g{1}.meanR)                            % Reward rate
+    else
+        rho_ = 0; % (JARM 20th September '19) reward rate optimisation does not currently converge for geometric discounting
+    end
 end
 
 %% Reward rate, Average-adjusted value, Decision (high resolution):
@@ -138,7 +143,7 @@ for iiT = 1:length(iT)
     subplotXY(4,length(iT),4,iiT);
         patch([-sqrt(2) sqrt(2) 0 -sqrt(2)], [-1/sqrt(3) -1/sqrt(3) sqrt(3) -1/sqrt(3)],'w', 'EdgeColor',0.5*[1 1 1]);
         for iD = 1:3
-            if isempty(dbIS{iD}) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
+            if isempty(dbIS{iD}.vertices) == 0 % (JARM 13th October '19) scaling value may lead to null intersection with decision boundaries
                 line([dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),1), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),1)]',...
                      [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),2), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),2)]',...
                      [dbIS{iD}.vertices2d(dbIS{iD}.edges(:,1),3), dbIS{iD}.vertices2d(dbIS{iD}.edges(:,2),3)]', ...
