@@ -26,3 +26,17 @@ To switch between maxisation of geometrically-discounted rewards and arithmetic 
 To scale option values change the value of the `valscale` variable.
 
 To change between linear and various nonlinear utility functions uncomment the appropriate `utilityFunc` definition.
+
+## Usage of non-linear-time experiments
+
+First, you must compute the decision boundaries over time. You can do that by running the `non-linear-time/computeProjections.m` script which will save the results to files stored in the `rawData/` folder.
+Use the command `computeProjections("all")` to compute the boundaries for all utility functions. Otherwise, specify the desired utility function as argument, e.g., `computeProjections("linear")`.
+You can add new utility functions by adding a new keywork and function in the initial lines (53~60) of the file `non-linear-time/computeProjections.m`. 
+Remember to compute the boundaries of both linear and non-linear temporal discount by varying the variable `geometric = ...;` in line 5 of `non-linear-time/computeProjections.m`. 
+
+Second, you must run the numerical simulation of the DDM. You can do that by running the `non-linear-time/numericalSimulations.m` script which will save the results to files stored in the `resultsData/` folder.
+Run the first and second sections of the script `non-linear-time/numericalSimulations.m`.
+
+Finally, you can plot the computed results using the third, fourth, and fifth sections of the `non-linear-time/numericalSimulations.m` script.
+
+

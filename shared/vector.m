@@ -1,2 +1,2 @@
 function v = vector(A)
-v = A(:)
+v = A(:);
