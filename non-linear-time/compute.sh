@@ -1,0 +1,21 @@
+#!/bin/bash
+
+module load apps/matlab/2020b
+
+qflags="-cwd"
+
+gamm=0.8
+
+for utility in linear logHm sqrt
+do
+  for geometric in {0..1}
+  do
+    for maxval in $(seq 3.0 0.5 5.0)
+    do
+      for logslope in $(seq 0.25 1.25 6.5) 
+      do 
+        qsub $qflags -v utility=$utility,geometric=$geometric,gamm=$gamm,maxval=$maxval,logslope=$logslope compute.qsub
+      done
+    done
+  done
+done

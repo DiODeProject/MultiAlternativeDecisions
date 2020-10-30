@@ -1,0 +1,6 @@
+#
+#$ -l h_cpu=07:59:00 -l mem=16G -l rmem=4G 
+#$ -q short.q
+#$ -m a
+#$ -M james.marshall@shef.ac.uk
+cd /home/fe1jm/MAD/non-linear-time && matlab -nojvm -nodisplay -nosplash -r "numericalSimulations(\"$utility\",$geometric,$gamm,$maxval,$logslope)"
