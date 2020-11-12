@@ -1,15 +1,20 @@
-function computeProjections(utility)
+function computeProjections(util, geom, gam, maxv, logs)
 addpath('../shared')
-global gamm geometric epsil pie; % (JARM 23rd August '19)
+global utility gamm geometric maxval logslope epsil pie; % (JARM 23rd August '19)
 global valscale; % (JARM 7th October '19)
-geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards
-fprintf("Script started with utlity %s and geometric %d\n",utility, geometric)
-gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards
+utility = util;
+gamm = gam;
+geometric = geom;
+maxval = maxv;
+logslope = logs;
+% geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards
+fprintf("Script started with utility %s (maxval %1.2f, logslope %1.2f) and geometric %d\n",utility, maxval, logslope, geometric)
+%gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards
 %gamm = 0.01; % Original value
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
-maxval = 4; % (JARM 6th March '20) maximum utility for logistic utility function
+%maxval = 4; % (JARM 6th March '20) maximum utility for logistic utility function
 %utility='tan';
 tic;
 Smax = 8;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
@@ -45,7 +50,7 @@ else
 end
 %for utility = ["tan", "logLm", "logHm"]
 for utility = utilities 
-    fprintf("Loop started with utlity %s and geometric %d\n",utility, geometric)
+    fprintf("Loop started with utility %s (maxval %1.2f, logslope %1.2f) and geometric %d\n",utility, maxval, logslope, geometric)
 %     computeProjectionsFiles(utility);
 %     clear dbIS V0 V D EVnext rho Ptrans iStrans;
 % end
@@ -56,10 +61,10 @@ if contains(utility , 'linear')
 elseif contains(utility , 'tan')
     utilityFunc = @(X) tanh(X);
 elseif contains(utility , 'logLm')
-    logslope = 0.75; % slope parameter for logistic utility function
+%    logslope = 0.75; % slope parameter for logistic utility function
     utilityFunc = @(X) -maxval + maxval*2./(1+exp(-logslope*(X)));
 elseif contains(utility , 'logHm')
-    logslope = 1.5; % slope parameter for logistic utility function
+%    logslope = 1.5; % slope parameter for logistic utility function
     utilityFunc = @(X) -maxval + maxval*2./(1+exp(-logslope*(X)));
 elseif contains(utility , 'sqrt')
     utilityFunc = @(X) sign(X).*abs(X).^0.5;
@@ -67,18 +72,18 @@ else
     fprintf("Invalid utility function: %s \n",utility)
 end
 
-figure;
-x=(-Smax:0.1:Smax);
-plot(x,utilityFunc(x),'LineWidth',8);
-xlabel('Reward')
-ylabel('Utility')
-set(gca,'FontSize',13)
-fprintf(strcat('simFigs/',utility,'.pdf\n'))
-saveas(gcf,strcat('simFigs/',utility,'.pdf'))
+% figure;
+% x=(-Smax:0.1:Smax);
+% plot(x,utilityFunc(x),'LineWidth',8);
+% xlabel('Reward')
+% ylabel('Utility')
+% set(gca,'FontSize',13)
+% fprintf(strcat('simFigs/',utility,'.pdf\n'))
+% saveas(gcf,strcat('simFigs/',utility,'.pdf'))
 
 % Compute boundaries for varying time and magnitude
 forceReComputeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
-singleDecisions=true; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
+singleDecisions=false; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
 magValues=-0.5:1:1.5; % magnitude of reward values to be tested
 timeSnaps=0:0.25:0.75; % mean reward values to be tested
 %timeSnaps=0:0.333:1; 
@@ -108,9 +113,9 @@ for magValue = magValues
     for timeSnap = timeSnaps
         iT=findnearest(timeSnap,t);
         if geometric
-            filename = strcat('rawData/plane_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'_plane-',num2str(magValue),'_snap-',num2str(iT),'.mat');
+            filename = strcat('rawData/plane_geom-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'_plane-',num2str(magValue),'_snap-',num2str(iT),'.mat');
         else
-            filename = strcat('rawData/plane_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'_plane-',num2str(magValue),'_snap-',num2str(iT),'.mat');
+            filename = strcat('rawData/plane_geom-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'_plane-',num2str(magValue),'_snap-',num2str(iT),'.mat');
         end
         % try to load the file
         dataLoaded = false;
@@ -123,9 +128,9 @@ for magValue = magValues
         end
         if ~dataLoaded % compute the projected boundaries
             if geometric
-                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
+                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
             else
-                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
+                filenameBounds = strcat('rawData/D_geom-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),singleDecisionsSuffix,'_u-',utility,'.mat');
             end
             if ~forceReComputeDecisionBoundaries && ~boundariesDataLoaded % load the decision threshold for all timesteps (matrix D)
                 try

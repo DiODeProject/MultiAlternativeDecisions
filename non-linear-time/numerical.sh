@@ -1,6 +1,7 @@
 #!/bin/bash
-
-module load apps/matlab/2020b
+#$ -V
+#$ -P rse
+# -q rse.q
 
 qflags="-cwd"
 

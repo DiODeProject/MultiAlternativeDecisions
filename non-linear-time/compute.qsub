@@ -1,6 +1,11 @@
+#!/bin/bash
 #
-#$ -l h_cpu=07:59:00 -l mem=16G -l rmem=4G 
-#$ -q short.q
+#$ -P rse
+#$ -q rse.q
+#$ -l h_rt=2:00:00
+#$ -l rmem=55G
 #$ -m a
+#$ -V
 #$ -M james.marshall@shef.ac.uk
+module load apps/matlab
 cd /home/fe1jm/MAD/non-linear-time && matlab -nojvm -nodisplay -nosplash -r "computeProjections(\"$utility\",$geometric,$gamm,$maxval,$logslope)"

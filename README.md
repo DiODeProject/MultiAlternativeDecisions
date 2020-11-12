@@ -31,12 +31,18 @@ To change between linear and various nonlinear utility functions uncomment the a
 
 First, you must compute the decision boundaries over time. You can do that by running the `non-linear-time/computeProjections.m` script which will save the results to files stored in the `rawData/` folder.
 Use the command `computeProjections("all")` to compute the boundaries for all utility functions. Otherwise, specify the desired utility function as argument, e.g., `computeProjections("linear")`.
-You can add new utility functions by adding a new keywork and function in the initial lines (53~60) of the file `non-linear-time/computeProjections.m`. 
-Remember to compute the boundaries of both linear and non-linear temporal discount by varying the variable `geometric = ...;` in line 5 of `non-linear-time/computeProjections.m`. 
+You can add new utility functions by adding a new keyword and function in the initial lines (53~60) of the file `non-linear-time/computeProjections.m`. 
+Remember to compute the boundaries of both linear and non-linear temporal discount by varying the variable `geometric = ...;`
 
 Second, you must run the numerical simulation of the DDM. You can do that by running the `non-linear-time/numericalSimulations.m` script which will save the results to files stored in the `resultsData/` folder.
-Run the first and second sections of the script `non-linear-time/numericalSimulations.m`.
 
-Finally, you can plot the computed results using the third, fourth, and fifth sections of the `non-linear-time/numericalSimulations.m` script.
+Both `computeProjections.m` and `numericalSimulations.m` take a number of compulsory arguments to specify the precise decision problem to be solved/simulated.
 
+Finally, you can plot the computed results using the third, fourth, and fifth sections of the `non-linear-time/plotResults.m` script.
+
+### Cluster operation
+
+`qsub` scripts are provided to run batch parallel experiments on a cluster:
+* `compute.sh`
+* `numerical.sh`
 
