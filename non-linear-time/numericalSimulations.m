@@ -74,9 +74,22 @@ else
 end
 suffix=[singleDecisionsSuffix '_u-' utility];
 
+if geometric
+    resultsfilename = strcat('resultsData/vs_geometric-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),strjoin(suffix,''),'.txt');
+else
+    resultsfilename = strcat('resultsData/vs_geometric-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),strjoin(suffix,''),'.txt');    
+end
+
+% check if results file already exists, quit if so
+if isfile(resultsfilename)
+    fprintf('Results file %s already exists - aborting\n', resultsfilename)
+   return 
+end
+
 Sscale = linspace(-Smax, Smax, resS); % define the range of possible rewards
 dataLoaded = false;
-for meanValue = meanValues    
+for meanValue = meanValues  
+    fprintf('Value: %f\n', meanValue)
     option1Mean = meanValue; option2Mean = meanValue; option3Mean = meanValue; % set actual mean, from which the evidence data is drawn, equal for both options
     if geometric
         filename = strcat('rawData/D_geom-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),strjoin(suffix,''),'.mat');
@@ -155,12 +168,8 @@ for meanValue = meanValues
         saveas(gcf,filename)
     end
 end
-if geometric
-    filename = strcat('resultsData/vs_geometric-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_g-',num2str(gamm),'_t-',num2str(tmax),strjoin(suffix,''),'.txt');
-else
-    filename = strcat('resultsData/vs_geometric-',num2str(geometric),'_mv-',num2str(maxval),'_ls-',num2str(logslope),'_rm-',num2str(g{1}.meanR),'_S-',num2str(Smax),'-',num2str(resS),'_c-',num2str(c),'_t-',num2str(tmax),strjoin(suffix,''),'.txt');    
-end
-csvwrite(filename,allResults);
+
+csvwrite(resultsfilename,allResults);
 %end
 end
 
