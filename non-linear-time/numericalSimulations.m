@@ -8,26 +8,22 @@ geometric = geom;
 maxval = maxv;
 logslope = logs;
 fprintf("Script started with utility %s (maxval %1.2f, logslope %1.2f) and geometric %d\n",utility, maxval, logslope, geometric)
-%geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards 
-%gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards 
-%gamm = 0.01; % Original value
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
-%maxval = 4; % (JARM 6th March '20) maximum utility for logistic utility function
-%utility='linear';
 tic;
-Smax = 8;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
-%Smax = 4;      % Original value
+Smax = 8;      % Grid range of states space (original value = 4; now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
 resSL  = 15;      % Grid resolution of state space
-resS = 151;      % Grid resolution of state space
-%resS = 101;      % Original value
-tmax = 37;       % Time limit
-%tmax = 3;       % Original value
-dt   = .0625;      % Time step for computing the decision matrix
-%dt   = .05;       % Original value
+resS = 151;      % Grid resolution of state space (original value = 101)
+if geometric
+    tmax = 3;       % Time limit
+    singleDecisions=false; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
+else
+    tmax = 3;       % Original value
+    singleDecisions=false;
+end
+dt   = .0625;      % Time step for computing the decision matrix (original value = 0.05)
 dtsim   = .005;    % Time step for computing the stochastic simulations
-c    = 0.6;       % Cost of evidence accumulation
-%tNull = 1;     % Non-decision time + inter trial interval
+c    = 0;       % Cost of evidence accumulation
 meanValue = 1.5;
 g{1}.meanR = meanValue; % Prior mean of state (dimension 1)
 g{1}.varR  = 5; % Prior variance of stte
@@ -50,14 +46,9 @@ end
 
 %% Run set of tests to measure value-sensitivity in equal alternative case
 for utility = utilities
-%for utility = ["linear", "logLm", "logHm", "sqrt", "tan"] 
-%for geo = [false true]
-%for geo = true
-%if geo; geometric=true; else; geometric=false; end
 savePlots = false; % set true only for few runs (e.g. 6)
-singleDecisions=false; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
 meanValues=0.5:0.5:3; % mean reward values to be tested
-meanValues = -1:0.1:3; % mean reward values to be tested 
+meanValues = -3:0.1:3; % mean reward values to be tested 
 numruns=10000; % number of simulations per test case
 allResults=zeros(length(meanValues)*numruns, 3); % structure to store the simulation results
 j=1; % result line counter

@@ -5,30 +5,29 @@ global valscale; % (JARM 7th October '19)
 utility = util;
 gamm = gam;
 geometric = geom;
+if geometric
+    singleDecisions=false; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
+else
+    singleDecisions=false;
+end
 maxval = maxv;
 logslope = logs;
-% geometric = false; % (JARM 23rd August '19) use geometric discounting for future rewards
 fprintf("Script started with utility %s (maxval %1.2f, logslope %1.2f) and geometric %d\n",utility, maxval, logslope, geometric)
-%gamm = 0.6; % (JARM 23rd August '19) geometric discount factor for future rewards
-%gamm = 0.01; % Original value
 epsil = 0; % (JARM 11th September '19) epsilon error to add to co-planar services to compute convex hull (required to check geometric discounting results; deprecated)
 pie = 0; % (JARM 27th May '20) input-dependent noise scaling 
 valscale = 0.5; % (JARM 7th October '19) move triangle along diagonal as option values scale)
-%maxval = 4; % (JARM 6th March '20) maximum utility for logistic utility function
-%utility='tan';
 tic;
-Smax = 8;      % Grid range of states space (now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
-%Smax = 4;      % Original value
+Smax = 8;      % Grid range of states space (original value = 4; now we assume: S = [(Rhat1+Rhat2)/2, (Rhat1-Rhat2)/2]); Rhat(t) = (varR*X(t)+varX)/(t*varR+varX) )
 resSL  = 51;      % Grid resolution of state space
-resS = 151;      % Grid resolution of state space
-%resS = 101;      % Original value
-tmax = 37;       % Time limit
-%tmax = 3;       % Original value
-dt   = .0625;       % Time step
-%dt   = .05;       % Original value
-c    = 0.6;       % Cost of evidence accumulation
-%c    = 0.01;       % Cost of evidence accumulation
-tNull = 1;     % Non-decision time + inter trial interval
+resS = 151;      % Grid resolution of state space (original value 101)
+if geometric
+    tmax = 3;       % Time limit
+else
+    tmax = 3;       % Original value
+end
+dt   = .0625;       % Time step (original value = 0.05)
+c    = 0;       % Cost of evidence accumulation (only used if not geometric)
+tNull = 2;     % Non-decision time + inter trial interval
 priorMean = 1.5;
 g{1}.meanR = priorMean; % Prior mean of state (dimension 1)
 g{1}.varR  = 5; % Prior variance of stte
@@ -72,35 +71,16 @@ else
     fprintf("Invalid utility function: %s \n",utility)
 end
 
-% figure;
-% x=(-Smax:0.1:Smax);
-% plot(x,utilityFunc(x),'LineWidth',8);
-% xlabel('Reward')
-% ylabel('Utility')
-% set(gca,'FontSize',13)
-% fprintf(strcat('simFigs/',utility,'.pdf\n'))
-% saveas(gcf,strcat('simFigs/',utility,'.pdf'))
-
 % Compute boundaries for varying time and magnitude
-forceReComputeDecisionBoundaries=false; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
-singleDecisions=false; % if true we model single decision (i.e. expected future rewards=0); if false we compute the expected future reward (rho_)
+forceReComputeDecisionBoundaries=true; % if true the code will compute the decision boundaries, if false will try to load the decision boundaries from the directory rawData (if it fails, it will recompute the data)
 magValues=-0.5:1:1.5; % magnitude of reward values to be tested
 timeSnaps=0:0.25:0.75; % mean reward values to be tested
-%timeSnaps=0:0.333:1; 
-%magValues=-0.5:0.5:0.5;
-%magValues=1.5;
-%timeSnaps=0.3;
 
 if singleDecisions
     singleDecisionsSuffix='-singleDec';
 else
     singleDecisionsSuffix='-multiDec';
 end
-% if geometric
-%     cost=gamm;
-% else
-%     cost=c;
-% end
 
 Sscale = linspace(-Smax, Smax, resS); % define the range of possible rewards
 [S{1},S{2},S{3}] = ndgrid(Sscale, Sscale, Sscale); % define the space of possible rewards
