@@ -3,37 +3,37 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
-    prefix='/Volumes/T7 Touch/tmp/resultsData/'
+    prefix='/Volumes/T7 Touch/tmp/jamesData/'
     eps=0.001
     geo=1 # use 0/1 
     maxval_range=np.arange(3,5+eps,0.5)
     # logslope_range=np.arange(3.5, 4.5+eps,1)
     utility='logHm';
-    meanValues = np.arange(-1,3+eps,0.1)
+    meanValues = np.arange(-3,3+eps,0.1)
 
     if geo == True:
         geoTitle = 'nonlinearTime'
-        cost='g-0.8'
-        logslope_range=np.arange(3.5, 6.5+eps,1)
-        ylimit=50
-        ticksize=6
-        titlesize=8
-        yvalues = [10,25,40]
-    else:
-        geoTitle = 'linearTime'
-        cost='c-0.6'
-        logslope_range=np.arange(0.25, 1.5+eps,0.25)
-        ylimit=0.15
+        cost='g-0.2'
+        logslope_range=np.arange(2.5, 5+eps,0.5)
+        ylimit=3.2
         ticksize=5
         titlesize=6
-        yvalues = [0.03,0.08,0.13]
+        yvalues = [0.5,1.5,2.5]
+    else:
+        geoTitle = 'linearTime'
+        cost='c-0'
+        logslope_range=np.arange(0.25, 1.5+eps,0.25)
+        ylimit=0.55
+        ticksize=5
+        titlesize=6
+        yvalues = [0.1,0.3,0.5]
     
-    suffix='_rm-1.5_S-8-151_'+cost+'_t-50-multiDec_u-'
+    suffix='_rm-1.5_S-8-151_'+cost+'_t-3-multiDec_u-'
     
     fig, axs = plt.subplots(len(maxval_range), len(logslope_range), sharex='col', sharey='row',
                         gridspec_kw={'hspace': 0, 'wspace': 0})
     # plt.setp(axs.flat, xlabel='X-label', ylabel='Y-label')
-    xvalues = np.arange(-0.5,2.5+eps,1.5)
+    xvalues = np.arange(-2,2+eps,2)
     # yvalues = np.arange(0,50+eps,10)
     
     row=0
@@ -82,7 +82,7 @@ if __name__ == '__main__':
         #ax.set_title("logslope = " +str(ls), fontsize=7 )
         ax.annotate("logslope = " +str(ls), xy=(0.5, 1), xytext=(0, pad),
                 xycoords='axes fraction', textcoords='offset points',
-                size='large', ha='center', va='baseline', fontsize=titlesize)
+                ha='center', va='baseline', fontsize=titlesize)
     
     for ax in axs[-1]:
         ax.set_xlabel("stimuli's magnitude", fontsize=ticksize)
@@ -95,7 +95,7 @@ if __name__ == '__main__':
         ax.yaxis.set_tick_params(labelsize=ticksize)
         ax.annotate("mv = " +str(mv), xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0),
                 xycoords=ax.yaxis.label, textcoords='offset points',
-                size='large', ha='right', va='center', fontsize=titlesize)
+                ha='right', va='center', fontsize=titlesize)
 
     #plt.show()
     fig.savefig("multiplot_" + geoTitle + "_" + cost + "_" + utility + ".pdf", bbox_inches='tight')
