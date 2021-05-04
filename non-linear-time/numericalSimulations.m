@@ -126,7 +126,7 @@ for meanValue = meanValues
             if decisionMade
                 break
             else
-                r1sum = r1sum + normrnd(option1Mean*dtsim, sqrt(g{1}.varX*dtsim));
+  	        r1sum = r1sum + normrnd(option1Mean*dtsim, sqrt(g{1}.varX*dtsim));
                 r2sum = r2sum + normrnd(option2Mean*dtsim, sqrt(g{2}.varX*dtsim));
                 r3sum = r3sum + normrnd(option3Mean*dtsim, sqrt(g{3}.varX*dtsim));
             end

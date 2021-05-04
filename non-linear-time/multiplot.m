@@ -16,7 +16,7 @@ meanValues = -3:0.1:3;
 
 if geo == true
     geoTitle = 'nonlinear time';
-    cost='g-0.3';
+    cost='g-0.1';
     deci='-multiDec_u-';
 else
     geoTitle = 'linear time';
@@ -47,7 +47,7 @@ for maxval=maxval_range
             ymax = max(0, max(mean(dataForPlot)+std(dataForPlot)/sqrt(height(allResults)/length(meanValues))*3) );
             %fprintf('%f \n',ymax);
             % Fixing the axes
-            ymin=0; if geo == true; ymax=ymax; else; ymax=0.5; end
+            ymin=0; if geo == true; ymax=3; else; ymax=0.5; end
             epsilon=(max(meanValues)-min(meanValues))*0.05;
             if ymin==ymax; ymax=ymin+0.0001; end
             axis([min(meanValues)-epsilon max(meanValues)+epsilon ymin ymax]);
