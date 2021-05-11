@@ -1,10 +1,11 @@
 # MultiAlternativeDecisions
-Code for comment on Tajima et al. (2019). Optimal policy for multi-alternative decisions. Nature Neuroscience.
-* [Preprint](https://www.biorxiv.org/content/10.1101/2019.12.18.880872v1.abstract)
+Code for Marshall, Reina and Pirrone (2021) Magnitude-sensitive reaction times reveal non-linear time costs in multi-alternative decision-making.
+* [Preprint](https://www.biorxiv.org/content/10.1101/2021.05.05.442775v1)
 
 These codes modify the analysis presented in the paper by Tajima et al. (2019), to examine the implication of maximising geometric-discounted future rewards on the optimal policy, rather than maximising arithmetic mean reward rate.
 
-**N.B.** reward rate across trials is not maximised, but set to 0; this has the effect of considering only single trial dynamics, since the cost of waiting for the next trial becomes zero. 
+In addition, numerical code is presented which simulates optimal Bayesian decision-makers using the derived optimal policies, to measure realised reaction times.
+
 
 ## Installation
 
@@ -38,11 +39,11 @@ Second, you must run the numerical simulation of the DDM. You can do that by run
 
 Both `computeProjections.m` and `numericalSimulations.m` take a number of compulsory arguments to specify the precise decision problem to be solved/simulated.
 
-Finally, you can plot the computed results using the third, fourth, and fifth sections of the `non-linear-time/plotResults.m` script.
+Finally, you can plot the computed results from sensitivity analyses (see _Cluster operation_ below) of the results using `non-linear-time/multiplot.m` script.
 
 ### Cluster operation
 
-`qsub` scripts are provided to run batch parallel experiments on a cluster:
+`qsub` scripts are provided to run batch parallel experiments on a cluster, in order to perform sensitivity analyses:
 * `compute.sh`
 * `numerical.sh`
 
